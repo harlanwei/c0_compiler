@@ -30,6 +30,6 @@ jobs:
         GOPATH: /home/runner/work/c0_compiler/go
 
     - name: Build
-      run: go build -v .
+      run: go build -v c0_compiler/cmd/cc0
       env:
         GOPATH: /home/runner/work/c0_compiler/go
