@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"c0_compiler/internal/cc0_error"
 	"c0_compiler/internal/token"
-	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"unicode"
@@ -22,18 +20,19 @@ func (p *Parser) HasNextToken() bool {
 	return p.pos < len(p.buffer)
 }
 
-func (p *Parser) NextToken() (res Token) {
-	res = p.buffer[p.pos]
+func (p *Parser) NextToken() (res *Token) {
+	res = &p.buffer[p.pos]
 	p.pos++
 	return
 }
 
-func (p *Parser) UnreadToken() bool {
+// Returns nil when no more tokens can be put back into the buffer.
+func (p *Parser) UnreadToken() (res *Token) {
 	if p.pos == 0 {
-		return false
+		return nil
 	}
 	p.pos--
-	return true
+	return &p.buffer[p.pos]
 }
 
 type parserError struct {
@@ -42,7 +41,7 @@ type parserError struct {
 }
 
 func reportPosition(token *Token) {
-	_, _ = fmt.Fprintf(os.Stderr, "At line %d, column %d: ", token.Line, token.Column)
+	cc0_error.ReportLineAndColumn(token.Line, token.Column)
 }
 
 var decMatcher, _ = regexp.Compile("^(0|([1-9][0-9]*))$")
@@ -131,6 +130,8 @@ func parseOperator(currentToken *Token) {
 		*kind = token.LessThan
 	case "!=":
 		*kind = token.NotEqualTo
+	case ",":
+		*kind = token.Comma
 	case ";":
 		*kind = token.Semicolon
 	default:

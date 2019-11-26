@@ -6,9 +6,14 @@ import (
 )
 
 const (
-	Source = 1
-	Parser = 2
+	Source = iota
+	Parser
+	Analyzer
 )
+
+func ReportLineAndColumn(line, column int) {
+	PrintfToStdErr("At line %d, column %d: ", line, column)
+}
 
 func PrintfToStdErr(formatString string, args... interface{}) {
 	_, _ = fmt.Fprintf(os.Stderr, formatString, args)
@@ -29,6 +34,8 @@ func throw(source int) {
 		sourceMessage = "Failed to open source file."
 	case Parser:
 		sourceMessage = "Parser encountered a problem. See output messages above."
+	case Analyzer:
+		sourceMessage = "Incorrect syntax encountered. See output messages above."
 	}
 	PrintlnToStdErr(sourceMessage)
 }
