@@ -162,20 +162,27 @@ func CreateInstance(scanner *bufio.Scanner) (parser *Parser) {
 	for scanner.Scan() {
 		lineCount++
 		columnCount := 0
-		tokens := make([]Token, 0)
+		line := strings.TrimSpace(scanner.Text())
+		for columnCount < len(line) {
+			character := line[columnCount]
+			if unicode.IsLetter(rune(character)) {
+				end := columnCount
+				for end < len(line) && unicode.IsLetter(rune(line[end])) {
+					end++
+				}
+				buffer = append(buffer, Token{
+					Kind:   token.NotParsed,
+					Value:  line[columnCount:end],
+					Line:   lineCount,
+					Column: columnCount,
+				})
+				columnCount = end
+			} else if unicode.IsNumber(rune(character)) {
 
-		line := scanner.Text()
-		for _, word := range strings.Fields(line) {
-			columnCount += strings.Index(line[columnCount:], word)
-			tokens = append(tokens, Token{
-				Kind:   token.NotParsed,
-				Value:  word,
-				Line:   lineCount,
-				Column: columnCount + 1,
-			})
-			columnCount += len(word)
+			} else {
+
+			}
 		}
-		buffer = append(buffer, tokens...)
 	}
 	parse(buffer)
 	parser = &Parser{buffer, 0}
