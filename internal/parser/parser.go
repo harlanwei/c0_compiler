@@ -80,9 +80,7 @@ func parseHexInteger(word string) int64 {
 }
 
 func parseIntegerLiteral(currentToken *Token) {
-	word := currentToken.Value.(string)
-
-	if word[0] == '0' {
+	if word := currentToken.Value.(string); word[0] == '0' {
 		if parsedValue := parseHexInteger(word); parsedValue >= 0 {
 			currentToken.Kind = token.IntegerLiteral
 			currentToken.Value = parsedValue
@@ -103,9 +101,8 @@ func parseIntegerLiteral(currentToken *Token) {
 
 func parseOperator(currentToken *Token) {
 	kind := &currentToken.Kind
-	word := currentToken.Value.(string)
 
-	switch word {
+	switch word := currentToken.Value.(string); word {
 	case "+":
 		*kind = token.PlusSign
 	case "-":
@@ -144,9 +141,8 @@ func parseOperator(currentToken *Token) {
 func parse(buffer []Token) {
 	for ind, _ := range buffer {
 		currentToken := &buffer[ind]
-		word := currentToken.Value.(string)
 
-		if unicode.IsNumber(rune(word[0])) {
+		if word := currentToken.Value.(string); unicode.IsNumber(rune(word[0])) {
 			parseIntegerLiteral(currentToken)
 		} else if unicode.IsLetter(rune(word[0])) {
 			// TODO: Identifier or keywords
