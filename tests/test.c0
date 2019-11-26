@@ -1,0 +1,9 @@
+int a = 3;
+
+void fn() {
+    int b = 4;
+    int c = 0x4fg;
+    if (a + 4 <= b) {
+
+    }
+}
