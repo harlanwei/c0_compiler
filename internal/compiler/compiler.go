@@ -16,7 +16,7 @@ func Run(in, out string, shouldCompileToBinary, isDebugging bool) {
 		cc0_error.ThrowAndExit(cc0_error.Source)
 	}
 	scanner := bufio.NewScanner(reader)
-	p := parser.CreateInstance(scanner)
+	p := parser.Parse(scanner)
 
 	var writer *bufio.Writer
 	if isDebugging {

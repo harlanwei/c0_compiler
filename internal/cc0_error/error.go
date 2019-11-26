@@ -10,6 +10,10 @@ const (
 	Parser = 2
 )
 
+func PrintfToStdErr(formatString string, args... interface{}) {
+	_, _ = fmt.Fprintf(os.Stderr, formatString, args)
+}
+
 func PrintToStdErr(message string) {
 	_, _ = fmt.Fprint(os.Stderr, message)
 }
@@ -24,7 +28,7 @@ func throw(source int) {
 	case Source:
 		sourceMessage = "Failed to open source file."
 	case Parser:
-		sourceMessage = "Parser failed."
+		sourceMessage = "Parser encountered a problem. See output messages above."
 	}
 	PrintlnToStdErr(sourceMessage)
 }

@@ -19,6 +19,26 @@ const (
 	RightParenthesis   = 24
 	Semicolon          = 25
 	IntegerLiteral     = 30
+	Const              = 40
+	Void               = 41
+	Int                = 42
+	Char               = 43
+	Double             = 44
+	Struct             = 45
+	If                 = 46
+	Else               = 47
+	Switch             = 48
+	Case               = 49
+	Default            = 50
+	While              = 51
+	For                = 52
+	Do                 = 53
+	Return             = 54
+	Break              = 55
+	Continue           = 56
+	Print              = 57
+	Scan               = 58
+	Identifier         = 1000
 )
 
 type any = interface{}

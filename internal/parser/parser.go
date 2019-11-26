@@ -8,7 +8,6 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"unicode"
 )
 
@@ -37,65 +36,64 @@ func (p *Parser) UnreadToken() bool {
 	return true
 }
 
+type parserError struct {
+	message string
+	fatal   bool
+}
+
 func reportPosition(token *Token) {
 	_, _ = fmt.Fprintf(os.Stderr, "At line %d, column %d: ", token.Line, token.Column)
 }
 
-type regexEngine struct {
-	decInteger *regexp.Regexp
-	hexInteger *regexp.Regexp
-}
+var decMatcher, _ = regexp.Compile("^(0|([1-9][0-9]*))$")
+var hexMatcher, _ = regexp.Compile("^[0-9a-fA-F]+$")
 
-func createDefaultEngine() *regexEngine {
-	decInteger, _ := regexp.Compile("^[1-9][0-9]*$")
-	hexInteger, _ := regexp.Compile("^0[xX][0-9a-fA-F]+$")
-	return &regexEngine{
-		decInteger: decInteger,
-		hexInteger: hexInteger,
-	}
-}
-
-var globalEngine *regexEngine
-
-func parseDecimalInteger(word string) int64 {
-	if globalEngine.decInteger.MatchString(word) {
-		value, err := strconv.ParseInt(word, 10, 64)
+// Accepts a regex matcher used to pre-check the format of the given word.
+func parseIntegerValue(matcher *regexp.Regexp, base int, word string) (int64, *parserError) {
+	if matcher.MatchString(word) {
+		value, err := strconv.ParseInt(word, base, 64)
 		if err != nil {
-			return -1
+			if _, ok := err.(*strconv.NumError); ok {
+				return 0, &parserError{"value out of range; set to 0", false}
+			}
+			return 0, &parserError{err.Error(), true}
 		}
-		return value
+		return value, nil
 	}
-	return -1
+	return 0, &parserError{"illegal integer literal", true}
 }
 
-func parseHexInteger(word string) int64 {
-	if globalEngine.hexInteger.MatchString(word) {
-		value, err := strconv.ParseInt(word, 16, 64)
-		if err != nil {
-			return -1
-		}
-		return value
-	}
-	return -1
+func decIntegerParser(word string) (int64, *parserError) {
+	return parseIntegerValue(decMatcher, 10, word)
+}
+
+func hexIntegerParser(word string) (int64, *parserError) {
+	// `strconv.ParseInt(.., 16, ..)` does not accept integers in the format of `0x1234`.
+	// Must remove the prefixes before handing the tokens over.
+	return parseIntegerValue(hexMatcher, 16, word[2:])
 }
 
 func parseIntegerLiteral(currentToken *Token) {
-	if word := currentToken.Value.(string); word[0] == '0' {
-		if parsedValue := parseHexInteger(word); parsedValue >= 0 {
-			currentToken.Kind = token.IntegerLiteral
-			currentToken.Value = parsedValue
-		} else {
-			reportPosition(currentToken)
-			cc0_error.PrintlnToStdErr("Illegal hexadecimal integer literal.")
-			cc0_error.ThrowAndExit(cc0_error.Parser)
-		}
-	} else if parsedValue := parseDecimalInteger(word); parsedValue >= 0 {
-		currentToken.Kind = token.IntegerLiteral
-		currentToken.Value = parsedValue
+	var integerParser func(string) (int64, *parserError)
+	word := currentToken.Value.(string)
+
+	if len(word) > 1 && (word[0:2] == "0x" || word[0:2] == "0X") {
+		integerParser = hexIntegerParser
 	} else {
+		integerParser = decIntegerParser
+	}
+
+	parsedValue, err := integerParser(word)
+	currentToken.Kind = token.IntegerLiteral
+	currentToken.Value = parsedValue
+	if err != nil {
 		reportPosition(currentToken)
-		cc0_error.PrintlnToStdErr("Illegal integer literal.")
-		cc0_error.ThrowAndExit(cc0_error.Parser)
+		cc0_error.PrintlnToStdErr(err.message)
+		if err.fatal {
+			cc0_error.ThrowAndExit(cc0_error.Parser)
+		} else {
+			cc0_error.ThrowButStayAlive(cc0_error.Parser)
+		}
 	}
 }
 
@@ -135,56 +133,130 @@ func parseOperator(currentToken *Token) {
 		*kind = token.NotEqualTo
 	case ";":
 		*kind = token.Semicolon
+	default:
+		reportPosition(currentToken)
+		cc0_error.PrintfToStdErr("Unrecognized character '%s'\n", word)
+		cc0_error.ThrowAndExit(cc0_error.Parser)
 	}
 }
 
-func parse(buffer []Token) {
+func parseKeywords(currentToken *Token) {
+	kind := &currentToken.Kind
+
+	switch word := currentToken.Value; word {
+	case "const":
+		*kind = token.Const
+	case "void":
+		*kind = token.Void
+	case "int":
+		*kind = token.Int
+	case "char":
+		*kind = token.Char
+	case "double":
+		*kind = token.Double
+	case "struct":
+		*kind = token.Struct
+	case "if":
+		*kind = token.If
+	case "else":
+		*kind = token.Else
+	case "switch":
+		*kind = token.Switch
+	case "case":
+		*kind = token.Case
+	case "default":
+		*kind = token.Default
+	case "while":
+		*kind = token.While
+	case "for":
+		*kind = token.For
+	case "do":
+		*kind = token.Do
+	case "return":
+		*kind = token.Return
+	case "break":
+		*kind = token.Break
+	case "continue":
+		*kind = token.Continue
+	case "print":
+		*kind = token.Print
+	case "scan":
+		*kind = token.Scan
+	default:
+		*kind = token.Identifier
+	}
+}
+
+func parseAllTheTokensIn(buffer []Token) {
 	for ind, _ := range buffer {
 		currentToken := &buffer[ind]
 
 		if word := currentToken.Value.(string); unicode.IsNumber(rune(word[0])) {
 			parseIntegerLiteral(currentToken)
 		} else if unicode.IsLetter(rune(word[0])) {
-			// TODO: Identifier or keywords
+			parseKeywords(currentToken)
 		} else {
 			parseOperator(currentToken)
 		}
 	}
 }
 
-func CreateInstance(scanner *bufio.Scanner) (parser *Parser) {
-	globalEngine = createDefaultEngine()
+func isDigitOrLetter(character rune) bool {
+	return unicode.IsNumber(character) || unicode.IsLetter(character)
+}
 
+var operatorsWithTwoCharacters = [...]string{"<=", ">=", "==", "!="}
+
+func isAnOperatorWithTwoCharacters(operator string) bool {
+	for _, op := range operatorsWithTwoCharacters {
+		if operator == op {
+			return true
+		}
+	}
+	return false
+}
+
+func divideTokens(lineCount int, line string, buffer *[]Token) {
+	columnCount := 0
+	for columnCount < len(line) {
+		character := rune(line[columnCount])
+		if unicode.IsSpace(character) {
+			columnCount++
+			continue
+		}
+		end := columnCount
+		if isDigitOrLetter(character) {
+			for end < len(line) && isDigitOrLetter(rune(line[end])) {
+				end++
+			}
+		} else {
+			if columnCount+1 < len(line) && isAnOperatorWithTwoCharacters(line[columnCount:columnCount+2]) {
+				end = columnCount + 2
+			} else {
+				end = columnCount + 1
+			}
+		}
+
+		*buffer = append(*buffer, Token{
+			Kind:   token.NotParsed,
+			Value:  line[columnCount:end],
+			Line:   lineCount,
+			Column: columnCount + 1,
+		})
+		columnCount = end
+	}
+}
+
+func Parse(scanner *bufio.Scanner) (parser *Parser) {
 	buffer := make([]Token, 0)
 	lineCount := 0
 
-	// TODO: fix the bugs related with dividers
 	for scanner.Scan() {
 		lineCount++
-		columnCount := 0
-		line := strings.TrimSpace(scanner.Text())
-		for columnCount < len(line) {
-			character := line[columnCount]
-			if unicode.IsLetter(rune(character)) {
-				end := columnCount
-				for end < len(line) && unicode.IsLetter(rune(line[end])) {
-					end++
-				}
-				buffer = append(buffer, Token{
-					Kind:   token.NotParsed,
-					Value:  line[columnCount:end],
-					Line:   lineCount,
-					Column: columnCount,
-				})
-				columnCount = end
-			} else if unicode.IsNumber(rune(character)) {
-
-			} else {
-
-			}
-		}
+		line := scanner.Text()
+		divideTokens(lineCount, line, &buffer)
 	}
-	parse(buffer)
+	parseAllTheTokensIn(buffer)
 	parser = &Parser{buffer, 0}
 
 	return
