@@ -5,6 +5,7 @@ import (
 	"c0_compiler/internal/cc0_error"
 	"c0_compiler/internal/parser"
 	"c0_compiler/internal/token"
+	"c0_compiler/internal/vm"
 	"fmt"
 )
 
@@ -30,10 +31,11 @@ type Error struct {
 }
 
 type symbol struct {
-	name       string
 	kind       c0Type
 	isConstant bool
 }
+
+var symbolTable map[string]symbol
 
 func reportFatalError(err *Error) {
 	cc0_error.ReportLineAndColumn(err.line, err.column)
@@ -100,8 +102,6 @@ func analyzePrimaryExpression() *Error {
 	//    | <integer-literal>
 	//    | <function-call>
 
-	// TODO
-
 	next, err := getNextToken()
 	if err != nil {
 		return errorOf(IncompleteExpression)
@@ -109,22 +109,33 @@ func analyzePrimaryExpression() *Error {
 
 	if next.Kind == token.LeftParenthesis {
 		// '('<expression>')'
-		// TODO
+		if err := analyzeExpression(); err != nil {
+			return err
+		}
+		next, err = getNextToken()
+		if err != nil {
+			return errorOf(IncompleteExpression)
+		}
+		if next.Kind != token.RightParenthesis {
+			return errorOf(IllegalExpression)
+		}
 	} else if next.Kind == token.Identifier {
 		// <identifier> || <function-call>
 
 		another, err := getNextToken()
+
 		if err != nil || another.Kind != token.LeftParenthesis {
 			if err := putBackAToken(); err != nil {
 				return err
 			}
-			// <identifier>
+			// TODO: <identifier>
 		} else {
-			// <function-call>
+			// TODO: <function-call>
 		}
 	} else if next.Kind == token.IntegerLiteral {
 		// <integer-literal>
-		// TODO
+		index := vm.AddConstant(next.Value)
+		vm.AddInstruction(vm.Loadc, index)
 	}
 	return errorOf(IllegalExpression)
 }
@@ -137,12 +148,15 @@ func analyzeUnaryExpression() *Error {
 	// <unary-expression> ::= [<unary-operator>]<primary-expression>
 
 	// [<unary-operator>]
+	shouldBeNegated := false
 	next, err := getNextToken()
 	if err != nil {
 		return errorOf(IncompleteExpression)
 	}
 	if isUnaryOperator(next) {
-		// TODO
+		if next.Kind == token.MinusSign {
+			shouldBeNegated = true
+		}
 	} else if err := putBackAToken(); err != nil {
 		return err
 	}
@@ -150,6 +164,10 @@ func analyzeUnaryExpression() *Error {
 	// <primary-expression>
 	if err := analyzePrimaryExpression(); err != nil {
 		return err
+	}
+
+	if shouldBeNegated {
+		vm.AddInstruction(vm.Ineg)
 	}
 	return nil
 }
@@ -174,6 +192,7 @@ func analyzeMultiplicativeExpression() *Error {
 				return err
 			}
 			return nil
+			// TODO: generate instructions
 		}
 		if err := analyzeUnaryExpression(); err != nil {
 			return err
@@ -200,6 +219,7 @@ func analyzeAdditiveExpression() *Error {
 			if err := putBackAToken(); err != nil {
 				return err
 			}
+			// TODO: generate instructions
 			return nil
 		}
 		if err := analyzeMultiplicativeExpression(); err != nil {
@@ -224,6 +244,7 @@ func analyzeDeclarator(isConstant bool, declaredType int) *Error {
 	if next.Kind != token.Identifier {
 		return errorOf(InvalidDeclaration)
 	}
+	// TODO: add to the symbol table
 
 	// <initializer> ::= '='<expression>
 	next, err = getNextToken()
