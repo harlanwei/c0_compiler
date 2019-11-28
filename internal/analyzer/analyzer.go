@@ -298,26 +298,147 @@ func analyzeVariableDeclarations() *Error {
 	}
 }
 
-func analyzeCompoundStatement() *Error {
+func analyzeReturnStatement() *Error {
+	// <return-statement> ::= 'return' [<expression>] ';'
 	// TODO
 	return nil
 }
 
-func analyzeParameterClause() *Error {
+func analyzeJumpStatement() *Error {
+	// <jump-statement> ::= <return-statement>
+	return analyzeReturnStatement()
+}
+
+func analyzeIOStatement() *Error {
+	// <scan-statement>  ::= 'scan' '(' <identifier> ')' ';'
+	// <print-statement> ::= 'print' '(' [<printable-list>] ')' ';'
+	// <printable-list>  ::= <printable> {',' <printable>}
+	// <printable> ::= <expression>
 	// TODO
+	return nil
+}
+
+func analyzeLoopStatement() *Error {
+	// <loop-statement> ::= 'while' '(' <condition> ')' <statement>
+	// TODO
+	return nil
+}
+
+func analyzeConditionStatement() *Error {
+	// <condition-statement> ::=  'if' '(' <condition> ')' <statement> ['else' <statement>]
+	// TODO
+	return nil
+}
+
+func analyzeStatement() *Error {
+	// <statement> ::=
+	//		'{' <statement-seq> '}'
+	// 		|<condition-statement>
+	// 		|<loop-statement>
+	// 		|<jump-statement>
+	// 		|<print-statement>
+	// 		|<scan-statement>
+	// 		|<assignment-expression>';'
+	// 		|<function-call>';'
+	// 		|';'
+	// TODO
+	return nil
+}
+
+func analyzeStatementSeq() *Error {
+	// TODO
+	return nil
+}
+
+func analyzeCompoundStatement() *Error {
+	// '{' {<variable-declaration>} <statement-seq> '}'
+	// TODO
+	return nil
+}
+
+func analyzeParameterDeclaration() *Error {
+	// [<const-qualifier>]<type-specifier><identifier>
+	// TODO
+	return nil
+}
+
+func analyzeParameterDeclarationList() *Error {
+	// <parameter-declaration-list> ::= <parameter-declaration>{','<parameter-declaration>}
+
+	// <parameter-declaration>
+	if err := analyzeParameterDeclaration(); err != nil {
+		return err
+	}
+
+	// {','<parameter-declaration>}
+	for {
+		next, err := getNextToken()
+		if err != nil {
+			return nil
+		}
+		if next.Kind != token.Comma {
+			if err := putBackAToken(); err != nil {
+				return err
+			}
+			return nil
+		}
+		if err := analyzeParameterDeclaration(); err != nil {
+			return err
+		}
+	}
+}
+
+func analyzeParameterClause() *Error {
+	// <parameter-clause> ::= '(' [<parameter-declaration-list>] ')'
+	next, err := getNextToken()
+	if err != nil || next.Kind != token.LeftParenthesis {
+		return errorOf(InvalidDeclaration)
+	}
+	if err := analyzeParameterDeclarationList(); err != nil {
+		return err
+	}
+	next, err = getNextToken()
+	if err != nil || next.Kind != token.RightParenthesis {
+		return errorOf(IncompleteExpression)
+	}
 	return nil
 }
 
 func analyzeFunctionDefinition() *Error {
 	// <function-definition> ::= <type-specifier><identifier><parameter-clause><compound-statement>
 
-	// TODO
+	next, err := getNextToken()
+	if err != nil || !next.IsATypeSpecifier() {
+		return errorOf(InvalidDeclaration)
+	}
+	// kind := next.Kind
+	next, err = getNextToken()
+	if err != nil || next.Kind != token.Identifier {
+		return errorOf(InvalidDeclaration)
+	}
+	if err := analyzeParameterClause(); err != nil {
+		return err
+	}
+	if err := analyzeCompoundStatement(); err != nil {
+		return err
+	}
+	// TODO: generate definition
 	return nil
 }
 
 func analyzeFunctionDefinitions() *Error {
-	// TODO
-	return nil
+	for {
+		next, err := getNextToken()
+		if backErr := putBackAToken(); backErr != nil {
+			return backErr
+		}
+		if err != nil || !next.IsATypeSpecifier() {
+			return nil
+		}
+		if err := analyzeFunctionDefinition(); err != nil {
+			return err
+		}
+	}
 }
 
 func Run(parser *Parser, writer *bufio.Writer, shouldCompileToBinary bool) {

@@ -50,3 +50,8 @@ type Token struct {
 	Line   int
 	Column int
 }
+
+func (t *Token) IsATypeSpecifier() bool {
+	k := t.Kind
+	return k == Int || k == Char || k == Void
+}
