@@ -2,68 +2,21 @@ package analyzer
 
 import (
 	"bufio"
-	"c0_compiler/internal/cc0_error"
 	"c0_compiler/internal/parser"
 	"c0_compiler/internal/token"
 	"c0_compiler/internal/vm"
 	"fmt"
 )
 
-const (
-	Bug = iota
-	NoMoreTokens
-	IncompleteVariableDeclaration
-	InvalidDeclaration
-	IncompleteExpression
-	IllegalExpression
-)
-
 type Parser = parser.Parser
 
 type Token = token.Token
-
-type c0Type = int
-
-type Error struct {
-	code   int
-	line   int
-	column int
-}
-
-type symbol struct {
-	kind       c0Type
-	isConstant bool
-}
-
-var symbolTable map[string]symbol
-
-func reportFatalError(err *Error) {
-	cc0_error.ReportLineAndColumn(err.line, err.column)
-	cc0_error.PrintlnToStdErr(err.Error())
-	cc0_error.ThrowAndExit(cc0_error.Analyzer)
-}
-
-func (error *Error) Error() string {
-	switch error.code {
-	case IncompleteVariableDeclaration:
-		return "the variable declaration is incomplete."
-	case InvalidDeclaration:
-		return "the declaration is not complying with the syntax."
-	case Bug:
-		return "there is a bug in the analyzer."
-	case IncompleteExpression:
-		return "the expression is not complete."
-	case IllegalExpression:
-		return "unexpected components in the expression."
-	default:
-		return "an unknown error occurred."
-	}
-}
 
 var globalParser *Parser
 var globalWriter *bufio.Writer
 var globalLineCount = 0
 var globalColumnCount = 0
+var globalSymbolTable, currentSymbolTable *symbolTable
 
 // Print all the tokens the parser generated directly to stdout.
 func BindToStdOut(parser *Parser) {
@@ -89,10 +42,6 @@ func putBackAToken() *Error {
 		globalLineCount, globalColumnCount = prev.Line, prev.Column
 	}
 	return errorOf(Bug)
-}
-
-func errorOf(code int) *Error {
-	return &Error{code, globalLineCount, globalColumnCount}
 }
 
 func analyzePrimaryExpression() *Error {
@@ -191,8 +140,12 @@ func analyzeMultiplicativeExpression() *Error {
 			if err := putBackAToken(); err != nil {
 				return err
 			}
+			if next.Kind == token.MultiplicationSign {
+				vm.AddInstruction(vm.Imul)
+			} else {
+				vm.AddInstruction(vm.Idiv)
+			}
 			return nil
-			// TODO: generate instructions
 		}
 		if err := analyzeUnaryExpression(); err != nil {
 			return err
@@ -219,7 +172,11 @@ func analyzeAdditiveExpression() *Error {
 			if err := putBackAToken(); err != nil {
 				return err
 			}
-			// TODO: generate instructions
+			if next.Kind == token.PlusSign {
+				vm.AddInstruction(vm.Iadd)
+			} else {
+				vm.AddInstruction(vm.Isub)
+			}
 			return nil
 		}
 		if err := analyzeMultiplicativeExpression(); err != nil {
@@ -244,7 +201,16 @@ func analyzeDeclarator(isConstant bool, declaredType int) *Error {
 	if next.Kind != token.Identifier {
 		return errorOf(InvalidDeclaration)
 	}
-	// TODO: add to the symbol table
+
+	if isConstant {
+		if err := currentSymbolTable.addVariable(next.Value.(string), declaredType); err != nil {
+			return err
+		}
+	} else {
+		if err := currentSymbolTable.addConstant(next.Value.(string), declaredType); err != nil {
+			return err
+		}
+	}
 
 	// <initializer> ::= '='<expression>
 	next, err = getNextToken()
@@ -282,7 +248,7 @@ func analyzeDeclaratorList(isConstant bool, declaredType int) *Error {
 	}
 }
 
-func analyzeVariableDeclaration() error {
+func analyzeVariableDeclaration() *Error {
 	// <variable-declaration> ::= [<const-qualifier>]<type-specifier><init-declarator-list>';'
 
 	// [<const-qualifier>]
@@ -318,15 +284,47 @@ func analyzeVariableDeclaration() error {
 }
 
 func analyzeVariableDeclarations() *Error {
+	for {
+		next, err := getNextToken()
+		if backErr := putBackAToken(); backErr != nil {
+			return backErr
+		}
+		if err != nil || (next.Kind != token.Identifier && next.Kind != token.Const) {
+			return nil
+		}
+		if err := analyzeVariableDeclaration(); err != nil {
+			return err
+		}
+	}
+}
+
+func analyzeCompoundStatement() *Error {
+	// TODO
+	return nil
+}
+
+func analyzeParameterClause() *Error {
+	// TODO
+	return nil
+}
+
+func analyzeFunctionDefinition() *Error {
+	// <function-definition> ::= <type-specifier><identifier><parameter-clause><compound-statement>
+
+	// TODO
 	return nil
 }
 
 func analyzeFunctionDefinitions() *Error {
+	// TODO
 	return nil
 }
 
 func Run(parser *Parser, writer *bufio.Writer, shouldCompileToBinary bool) {
 	globalParser, globalWriter = parser, writer
+	globalSymbolTable = initGlobalSymbolTable()
+	currentSymbolTable = globalSymbolTable
+
 	if err := analyzeVariableDeclarations(); err != nil {
 		reportFatalError(err)
 	}
