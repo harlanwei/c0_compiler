@@ -206,13 +206,10 @@ func isDigitOrLetter(character rune) bool {
 	return unicode.IsNumber(character) || unicode.IsLetter(character)
 }
 
-var operatorsWithTwoCharacters = [...]string{"<=", ">=", "==", "!="}
-
 func isAnOperatorWithTwoCharacters(operator string) bool {
-	for _, op := range operatorsWithTwoCharacters {
-		if operator == op {
-			return true
-		}
+	switch operator {
+	case "<=", ">=", "==", "!=":
+		return true
 	}
 	return false
 }
