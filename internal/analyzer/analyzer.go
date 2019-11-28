@@ -450,7 +450,7 @@ func analyzeParameterDeclarationList(functionName string) *Error {
 	// <parameter-declaration-list> ::= <parameter-declaration>{','<parameter-declaration>}
 
 	// <parameter-declaration>
-	if err := analyzeParameterDeclaration(); err != nil {
+	if err := analyzeParameterDeclaration(functionName); err != nil {
 		return err
 	}
 
