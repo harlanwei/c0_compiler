@@ -3,14 +3,20 @@ package analyzer
 import "container/heap"
 
 type symbol struct {
-	kind       c0Type
-	isConstant bool
-	address    int
+	kind        c0Type
+	isConstant  bool
+	isAFunction bool
+	address     int
+	appendix    interface{}
 }
 
 type symbolTable struct {
 	symbols map[string]symbol
 	parent  *symbolTable
+}
+
+type function struct {
+	symbols symbolTable
 }
 
 var emptySlots = &PriorityQueue{0}
@@ -38,6 +44,11 @@ func (st symbolTable) addVariable(name string, kind c0Type) *Error {
 		isConstant: false,
 		address:    -1,
 	}
+	return nil
+}
+
+func (st symbolTable) addFunction(name string) *Error {
+	// TODO
 	return nil
 }
 

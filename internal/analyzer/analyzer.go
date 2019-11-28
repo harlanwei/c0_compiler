@@ -56,8 +56,8 @@ func analyzePrimaryExpression() *Error {
 		return errorOf(IncompleteExpression)
 	}
 
+	// '('<expression>')'
 	if next.Kind == token.LeftParenthesis {
-		// '('<expression>')'
 		if err := analyzeExpression(); err != nil {
 			return err
 		}
@@ -68,9 +68,7 @@ func analyzePrimaryExpression() *Error {
 		if next.Kind != token.RightParenthesis {
 			return errorOf(IllegalExpression)
 		}
-	} else if next.Kind == token.Identifier {
-		// <identifier> || <function-call>
-
+	} else if next.Kind == token.Identifier { // <identifier> || <function-call>
 		another, err := getNextToken()
 
 		if err != nil || another.Kind != token.LeftParenthesis {
@@ -320,13 +318,67 @@ func analyzeIOStatement() *Error {
 
 func analyzeLoopStatement() *Error {
 	// <loop-statement> ::= 'while' '(' <condition> ')' <statement>
+	// TODO: generate instructions
+	next, err := getNextToken()
+	if err != nil || next.Kind != token.While {
+		return errorOf(InvalidStatement)
+	}
+	next, err = getNextToken()
+	if err != nil || next.Kind != token.LeftParenthesis {
+		return errorOf(InvalidStatement)
+	}
+	if err := analyzeCondition(); err != nil {
+		return err
+	}
+	next, err = getNextToken()
+	if err != nil || next.Kind != token.RightParenthesis {
+		return errorOf(InvalidStatement)
+	}
+	return nil
+}
+
+func analyzeCondition() *Error {
+	// <condition> ::= <expression>[<relational-operator><expression>]
 	// TODO
+	if err := analyzeExpression(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func analyzeConditionStatement() *Error {
 	// <condition-statement> ::=  'if' '(' <condition> ')' <statement> ['else' <statement>]
-	// TODO
+	// TODO: generate instructions
+
+	if next, err := getNextToken(); err != nil || next.Kind != token.If {
+		return errorOf(InvalidStatement)
+	}
+	if next, err := getNextToken(); err != nil || next.Kind != token.LeftParenthesis {
+		return errorOf(InvalidStatement)
+	}
+	if err := analyzeCondition(); err != nil {
+		return err
+	}
+	if next, err := getNextToken(); err != nil || next.Kind != token.RightParenthesis {
+		return errorOf(InvalidStatement)
+	}
+	if err := analyzeStatement(); err != nil {
+		return err
+	}
+	if next, err := getNextToken(); err != nil || next.Kind != token.Else {
+		// Only when a token is actually read is there the need to put back a token
+		if err != nil {
+			if backErr := putBackAToken(); backErr != nil {
+				return backErr
+			}
+		}
+		return nil
+	}
+	if err := analyzeStatement(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -352,17 +404,49 @@ func analyzeStatementSeq() *Error {
 
 func analyzeCompoundStatement() *Error {
 	// '{' {<variable-declaration>} <statement-seq> '}'
-	// TODO
+	if next, err := getNextToken(); err != nil || next.Kind != token.LeftBracket {
+		return errorOf(InvalidStatement)
+	}
+	if err := analyzeVariableDeclarations(); err != nil {
+		return err
+	}
+	if err := analyzeStatementSeq(); err != nil {
+		return err
+	}
+	if next, err := getNextToken(); err != nil || next.Kind != token.RightBracket {
+		return errorOf(InvalidStatement)
+	}
 	return nil
 }
 
-func analyzeParameterDeclaration() *Error {
+func analyzeParameterDeclaration(functionName string) *Error {
 	// [<const-qualifier>]<type-specifier><identifier>
-	// TODO
+	next, err := getNextToken()
+	if err != nil {
+		return errorOf(InvalidDeclaration)
+	}
+	// isConst := false
+	if next.Kind == token.Const {
+		// isConst = true
+		next, err = getNextToken()
+		if err != nil {
+			return errorOf(InvalidDeclaration)
+		}
+	}
+	if !next.IsATypeSpecifier() {
+		return errorOf(InvalidDeclaration)
+	}
+	// kind := tokenKindToType(next)
+	next, err = getNextToken()
+	if err != nil || next.Kind != token.Identifier {
+		return errorOf(InvalidDeclaration)
+	}
+
+	// TODO: generate instructions
 	return nil
 }
 
-func analyzeParameterDeclarationList() *Error {
+func analyzeParameterDeclarationList(functionName string) *Error {
 	// <parameter-declaration-list> ::= <parameter-declaration>{','<parameter-declaration>}
 
 	// <parameter-declaration>
@@ -382,19 +466,19 @@ func analyzeParameterDeclarationList() *Error {
 			}
 			return nil
 		}
-		if err := analyzeParameterDeclaration(); err != nil {
+		if err := analyzeParameterDeclaration(functionName); err != nil {
 			return err
 		}
 	}
 }
 
-func analyzeParameterClause() *Error {
+func analyzeParameterClause(functionName string) *Error {
 	// <parameter-clause> ::= '(' [<parameter-declaration-list>] ')'
 	next, err := getNextToken()
 	if err != nil || next.Kind != token.LeftParenthesis {
 		return errorOf(InvalidDeclaration)
 	}
-	if err := analyzeParameterDeclarationList(); err != nil {
+	if err := analyzeParameterDeclarationList(functionName); err != nil {
 		return err
 	}
 	next, err = getNextToken()
@@ -416,7 +500,8 @@ func analyzeFunctionDefinition() *Error {
 	if err != nil || next.Kind != token.Identifier {
 		return errorOf(InvalidDeclaration)
 	}
-	if err := analyzeParameterClause(); err != nil {
+	identifier := next.Value.(string)
+	if err := analyzeParameterClause(identifier); err != nil {
 		return err
 	}
 	if err := analyzeCompoundStatement(); err != nil {
