@@ -53,5 +53,18 @@ type Token struct {
 
 func (t *Token) IsATypeSpecifier() bool {
 	k := t.Kind
-	return k == Int || k == Char || k == Void
+	switch k {
+	case Int, Char, Void:
+		return true
+	}
+	return false
+}
+
+func (t *Token) IsARelationalOperator() bool {
+	k := t.Kind
+	switch k {
+	case LessThan, LessThanOrEqual, GreaterThan, GreaterThanOrEqual, NotEqualTo, EqualTo:
+		return true
+	}
+	return false
 }

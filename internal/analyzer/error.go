@@ -11,6 +11,8 @@ const (
 	IllegalExpression
 	RedeclaredAnIdentifier
 	InvalidStatement
+	IncompleteFunctionCall
+	UndefinedIdentifier
 )
 
 type Error struct {
@@ -41,6 +43,10 @@ func (error *Error) Error() string {
 		return "an identifier cannot be redeclared."
 	case InvalidStatement:
 		return "encountered an illegal statement."
+	case IncompleteFunctionCall:
+		return "the function call is not complete."
+	case UndefinedIdentifier:
+		return "cannot use an undefined identifier."
 	default:
 		return "an unknown error occurred."
 	}
