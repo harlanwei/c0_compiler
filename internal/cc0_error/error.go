@@ -15,8 +15,8 @@ func ReportLineAndColumn(line, column int) {
 	PrintfToStdErr("At line %d, column %d: ", line, column)
 }
 
-func PrintfToStdErr(formatString string, args... interface{}) {
-	_, _ = fmt.Fprintf(os.Stderr, formatString, args)
+func PrintfToStdErr(formatString string, args ...interface{}) {
+	_, _ = fmt.Fprintf(os.Stderr, formatString, args...)
 }
 
 func PrintToStdErr(message string) {

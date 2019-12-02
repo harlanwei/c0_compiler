@@ -1,5 +1,7 @@
 package vm
 
+import "fmt"
+
 var instructions []instruction
 
 type code = int
@@ -127,9 +129,14 @@ var code2string = map[int]string{
 	Aret:    "aret",
 }
 
-func AddInstruction(code code, operands ...any) {
-	instructions = append(instructions, instruction{
-		code:     code,
-		operands: operands,
-	})
+func InstructionWithNoOperands(code code) string {
+	return code2string[code]
+}
+
+func InstructionWithOneOperand(code code, operand int) string {
+	return fmt.Sprintf("%s %d", code2string[code], operand)
+}
+
+func InstructionWithTwoOperands(code code, operand1, operand2 int) string {
+	return fmt.Sprintf("%s %d, %d", code2string[code], operand1, operand2)
 }

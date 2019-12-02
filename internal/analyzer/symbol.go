@@ -3,11 +3,17 @@ package analyzer
 import "container/heap"
 
 type symbol struct {
-	kind        c0Type
-	isConstant  bool
-	isAFunction bool
-	address     int
-	appendix    interface{}
+	kind       c0Type
+	isConstant bool
+	isCallable bool
+	address    int
+	appendix   interface{}
+}
+
+type functionInfo struct {
+	symbols      *symbolTable
+	instructions []string
+	parameters   []string
 }
 
 type symbolTable struct {
@@ -34,7 +40,7 @@ func (st symbolTable) hasDeclared(name string) bool {
 	return ok
 }
 
-func (st symbolTable) addVariable(name string, kind c0Type) *Error {
+func (st symbolTable) addAVariable(name string, kind c0Type) *Error {
 	if st.hasDeclared(name) {
 		return errorOf(RedeclaredAnIdentifier)
 	}
@@ -47,9 +53,38 @@ func (st symbolTable) addVariable(name string, kind c0Type) *Error {
 	return nil
 }
 
-func (st symbolTable) addFunction(name string) *Error {
-	// TODO
-	return nil
+func (st symbolTable) addAFunction(name string, returnType c0Type) *Error {
+	return st.addAConstant(name, returnType, true)
+}
+
+func (sb symbol) addAnInstruction(instruction string) {
+	sb.appendix.(functionInfo).addAnInstruction(instruction)
+}
+
+func (fi functionInfo) addAnInstruction(instruction string) {
+	fi.instructions = append(fi.instructions, instruction)
+}
+
+func (st symbolTable) getSymbol(symbol string) *symbol {
+	currentTable := &st
+	for {
+		if sb, ok := currentTable.symbols[symbol]; ok {
+			return &sb
+		}
+		if currentTable.parent != nil {
+			currentTable = currentTable.parent
+		} else {
+			return nil
+		}
+	}
+}
+
+func (st symbolTable) getAddressOf(symbol string) int {
+	sb := st.getSymbol(symbol)
+	if sb == nil {
+		return -1
+	}
+	return sb.address
 }
 
 func (st symbolTable) removeConstant(name string) *Error {
@@ -61,13 +96,14 @@ func (st symbolTable) removeConstant(name string) *Error {
 	return nil
 }
 
-func (st symbolTable) addConstant(name string, kind c0Type) *Error {
+func (st symbolTable) addAConstant(name string, kind c0Type, isAFunction bool) *Error {
 	if st.hasDeclared(name) {
 		return errorOf(RedeclaredAnIdentifier)
 	}
 	st.symbols[name] = symbol{
 		kind:       kind,
 		isConstant: true,
+		isCallable: isAFunction,
 		address:    nextSlot(),
 	}
 	return nil

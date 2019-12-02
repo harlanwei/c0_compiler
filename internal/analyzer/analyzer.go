@@ -2,49 +2,14 @@ package analyzer
 
 import (
 	"bufio"
-	"c0_compiler/internal/parser"
 	"c0_compiler/internal/token"
 	"c0_compiler/internal/vm"
-	"fmt"
 )
-
-type Parser = parser.Parser
-
-type Token = token.Token
 
 var globalParser *Parser
 var globalWriter *bufio.Writer
-var globalLineCount = 0
-var globalColumnCount = 0
 var globalSymbolTable, currentSymbolTable *symbolTable
-
-// Print all the tokens the parser generated directly to stdout.
-func BindToStdOut(parser *Parser) {
-	for parser.HasNextToken() {
-		fmt.Println(parser.NextToken())
-	}
-}
-
-// The only error this function will throw is NoMoreTokens so it's safe to check `err != nil` directly without
-// specifying the kind of error.
-func getNextToken() (res *Token, err error) {
-	if !globalParser.HasNextToken() {
-		res, err = nil, &Error{NoMoreTokens, globalLineCount, globalColumnCount}
-		return
-	}
-	res, err = globalParser.NextToken(), nil
-	globalLineCount, globalColumnCount = res.Line, res.Column
-	return
-}
-
-func putBackTokens() *Error {
-	// TODO: refactor this so that multiple tokens read by the current analysis function can be put back
-	// TODO: also, move error handling directly into this function instead of having each individual function do it
-	if prev := globalParser.UnreadToken(); prev != nil {
-		globalLineCount, globalColumnCount = prev.Line, prev.Column
-	}
-	return errorOf(Bug)
-}
+var globalStart, currentFunction *functionInfo
 
 func analyzePrimaryExpression() *Error {
 	// <primary-expression> ::=
@@ -71,20 +36,27 @@ func analyzePrimaryExpression() *Error {
 			return errorOf(IllegalExpression)
 		}
 	} else if next.Kind == token.Identifier { // <identifier> || <function-call>
-		another, err := getNextToken()
-
-		if err != nil || another.Kind != token.LeftParenthesis {
-			_ = putBackTokens()
-			// TODO: <identifier>
+		identifier := next.Value.(string)
+		sb := currentSymbolTable.getSymbol(identifier)
+		if sb == nil {
+			return errorOf(UndefinedIdentifier)
+		}
+		if sb.isCallable {
+			if err := analyzeFunctionCall(); err != nil {
+				return err
+			}
 		} else {
-			// TODO: <function-call>
+			currentFunction.addAnInstruction("ipush " + string(sb.address))
+			currentFunction.addAnInstruction("iload")
 		}
 	} else if next.Kind == token.IntegerLiteral {
 		// <integer-literal>
 		index := vm.AddConstant(next.Value)
-		vm.AddInstruction(vm.Loadc, index)
+		currentFunction.addAnInstruction(vm.InstructionWithOneOperand(vm.Loadc, index))
+	} else {
+		return errorOf(IllegalExpression)
 	}
-	return errorOf(IllegalExpression)
+	return nil
 }
 
 func isUnaryOperator(t *Token) bool {
@@ -105,7 +77,7 @@ func analyzeUnaryExpression() *Error {
 			shouldBeNegated = true
 		}
 	} else {
-		_ = putBackTokens()
+		_ = putBackAToken()
 	}
 
 	// <primary-expression>
@@ -114,7 +86,7 @@ func analyzeUnaryExpression() *Error {
 	}
 
 	if shouldBeNegated {
-		vm.AddInstruction(vm.Ineg)
+		currentFunction.addAnInstruction("ineg")
 	}
 	return nil
 }
@@ -135,16 +107,16 @@ func analyzeMultiplicativeExpression() *Error {
 	for {
 		next, err := getNextToken()
 		if err != nil || !isMultiplicativeOperator(next) {
-			_ = putBackTokens()
-			if next.Kind == token.MultiplicationSign {
-				vm.AddInstruction(vm.Imul)
-			} else {
-				vm.AddInstruction(vm.Idiv)
-			}
+			_ = putBackAToken()
 			return nil
 		}
 		if err := analyzeUnaryExpression(); err != nil {
 			return err
+		}
+		if next.Kind == token.MultiplicationSign {
+			currentFunction.addAnInstruction("imul")
+		} else {
+			currentFunction.addAnInstruction("idiv")
 		}
 	}
 }
@@ -165,16 +137,19 @@ func analyzeAdditiveExpression() *Error {
 	for {
 		next, err := getNextToken()
 		if err != nil || !isAdditiveOperator(next) {
-			_ = putBackTokens()
-			if next.Kind == token.PlusSign {
-				vm.AddInstruction(vm.Iadd)
-			} else {
-				vm.AddInstruction(vm.Isub)
-			}
+			_ = putBackAToken()
 			return nil
 		}
+		operator := next.Kind
 		if err := analyzeMultiplicativeExpression(); err != nil {
+			_ = putBackAToken()
 			return err
+		}
+
+		if operator == token.PlusSign {
+			currentFunction.addAnInstruction("iadd")
+		} else {
+			currentFunction.addAnInstruction("isub")
 		}
 	}
 }
@@ -195,13 +170,14 @@ func analyzeDeclarator(isConstant bool, declaredType int) *Error {
 	if next.Kind != token.Identifier {
 		return errorOf(InvalidDeclaration)
 	}
+	identifier := next.Value.(string)
 
 	if isConstant {
-		if err := currentSymbolTable.addVariable(next.Value.(string), declaredType); err != nil {
+		if err := currentSymbolTable.addAConstant(identifier, declaredType, false); err != nil {
 			return err
 		}
 	} else {
-		if err := currentSymbolTable.addConstant(next.Value.(string), declaredType); err != nil {
+		if err := currentSymbolTable.addAVariable(identifier, declaredType); err != nil {
 			return err
 		}
 	}
@@ -212,7 +188,7 @@ func analyzeDeclarator(isConstant bool, declaredType int) *Error {
 		return nil
 	}
 	if next.Kind != token.AssignmentSign {
-		_ = putBackTokens()
+		_ = putBackAToken()
 		return nil
 	}
 	if err := analyzeExpression(); err != nil {
@@ -228,11 +204,11 @@ func analyzeDeclaratorList(isConstant bool, declaredType int) *Error {
 	}
 	for {
 		next, err := getNextToken()
-		if err != nil {
+		if !(err == nil && next.Kind == token.Comma) {
+			if err == nil {
+				_ = putBackAToken()
+			}
 			return nil
-		}
-		if next.Kind != token.Comma {
-			return errorOf(InvalidDeclaration)
 		}
 		if err := analyzeDeclarator(isConstant, declaredType); err != nil {
 			return err
@@ -240,8 +216,16 @@ func analyzeDeclaratorList(isConstant bool, declaredType int) *Error {
 	}
 }
 
-func analyzeVariableDeclaration() *Error {
+func analyzeVariableDeclaration(fun *functionInfo) *Error {
 	// <variable-declaration> ::= [<const-qualifier>]<type-specifier><init-declarator-list>';'
+
+	if fun == nil {
+		currentSymbolTable = globalSymbolTable
+		currentFunction = globalStart
+	} else {
+		currentFunction = fun
+		currentSymbolTable = fun.symbols
+	}
 
 	// [<const-qualifier>]
 	next, err := getNextToken()
@@ -258,13 +242,13 @@ func analyzeVariableDeclaration() *Error {
 	}
 
 	// <type-specifier>
-	// might need a little expansion
 	if next.Kind != token.Int {
 		return errorOf(IncompleteVariableDeclaration)
 	}
+	kind := tokenKindToType(next)
 
 	// <init-declarator-list>
-	if err := analyzeDeclaratorList(isAConstant, TypeInt); err != nil {
+	if err := analyzeDeclaratorList(isAConstant, kind); err != nil {
 		return err
 	}
 
@@ -275,14 +259,14 @@ func analyzeVariableDeclaration() *Error {
 	return nil
 }
 
-func analyzeVariableDeclarations() *Error {
+func analyzeVariableDeclarations(fun *functionInfo) *Error {
 	for {
 		next, err := getNextToken()
-		_ = putBackTokens()
-		if err != nil || (next.Kind != token.Identifier && next.Kind != token.Const) {
+		_ = putBackAToken()
+		if err != nil || (next.Kind != token.Int && next.Kind != token.Const) {
 			return nil
 		}
-		if err := analyzeVariableDeclaration(); err != nil {
+		if err := analyzeVariableDeclaration(fun); err != nil {
 			return err
 		}
 	}
@@ -290,17 +274,16 @@ func analyzeVariableDeclarations() *Error {
 
 func analyzeReturnStatement() *Error {
 	// <return-statement> ::= 'return' [<expression>] ';'
-
 	if next, err := getNextToken(); err != nil || next.Kind != token.Return {
 		if err == nil {
-			_ = putBackTokens()
+			_ = putBackAToken()
 		}
 		return errorOf(InvalidStatement)
 	}
 	_ = analyzeExpression()
 	if next, err := getNextToken(); err != nil || next.Kind != token.Semicolon {
 		if err == nil {
-			_ = putBackTokens()
+			_ = putBackAToken()
 		}
 		return errorOf(InvalidStatement)
 	}
@@ -325,7 +308,7 @@ func analyzePrintableList() *Error {
 	for {
 		if next, err := getNextToken(); err != nil || next.Kind != token.Comma {
 			if err == nil {
-				_ = putBackTokens()
+				_ = putBackAToken()
 			}
 			return nil
 		}
@@ -367,6 +350,7 @@ func analyzeIOStatement() *Error {
 			return errorOf(InvalidStatement)
 		}
 	} else {
+		_ = putBackAToken()
 		return errorOf(InvalidStatement)
 	}
 	if next, err := getNextToken(); err != nil || next.Kind != token.Semicolon {
@@ -380,6 +364,9 @@ func analyzeLoopStatement() *Error {
 	// TODO: generate instructions
 	next, err := getNextToken()
 	if err != nil || next.Kind != token.While {
+		if err == nil {
+			_ = putBackAToken()
+		}
 		return errorOf(InvalidStatement)
 	}
 	next, err = getNextToken()
@@ -407,7 +394,7 @@ func analyzeCondition() *Error {
 		return nil
 	}
 	if !next.IsARelationalOperator() {
-		_ = putBackTokens()
+		_ = putBackAToken()
 		return nil
 	}
 	if err := analyzeExpression(); err != nil {
@@ -417,11 +404,14 @@ func analyzeCondition() *Error {
 	return nil
 }
 
-func analyzeConditionStatement() *Error {
+func analyzeConditionStatement(fun *functionInfo) *Error {
 	// <condition-statement> ::=  'if' '(' <condition> ')' <statement> ['else' <statement>]
 	// TODO: generate instructions
 
 	if next, err := getNextToken(); err != nil || next.Kind != token.If {
+		if err == nil {
+			_ = putBackAToken()
+		}
 		return errorOf(InvalidStatement)
 	}
 	if next, err := getNextToken(); err != nil || next.Kind != token.LeftParenthesis {
@@ -433,17 +423,17 @@ func analyzeConditionStatement() *Error {
 	if next, err := getNextToken(); err != nil || next.Kind != token.RightParenthesis {
 		return errorOf(InvalidStatement)
 	}
-	if err := analyzeStatement(); err != nil {
+	if err := analyzeStatement(fun); err != nil {
 		return err
 	}
 	if next, err := getNextToken(); err != nil || next.Kind != token.Else {
 		// Only when a token is actually read is there the need to put back a token
 		if err == nil {
-			_ = putBackTokens()
+			_ = putBackAToken()
 		}
 		return nil
 	}
-	if err := analyzeStatement(); err != nil {
+	if err := analyzeStatement(fun); err != nil {
 		return err
 	}
 
@@ -457,7 +447,7 @@ func analyzeAssignmentExpression() *Error {
 		return errorOf(IncompleteExpression)
 	}
 	if next.Kind != token.Identifier {
-		_ = putBackTokens()
+		_ = putBackAToken()
 		return errorOf(IncompleteExpression)
 	}
 	if next, err := getNextToken(); err != nil || next.Kind != token.AssignmentSign {
@@ -477,7 +467,7 @@ func analyzeExpressionList() *Error {
 	for {
 		if next, err := getNextToken(); err != nil || next.Kind != token.Comma {
 			if err == nil {
-				_ = putBackTokens()
+				_ = putBackAToken()
 			}
 			return nil
 		}
@@ -494,11 +484,12 @@ func analyzeFunctionCall() *Error {
 		return errorOf(IncompleteFunctionCall)
 	}
 	if next.Kind != token.Identifier {
-		_ = putBackTokens()
+		_ = putBackAToken()
 		return errorOf(IncompleteFunctionCall)
 	}
 	identifier := next.Value.(string)
-	if !currentSymbolTable.hasDeclared(identifier) {
+	sb := currentSymbolTable.getSymbol(identifier)
+	if sb == nil {
 		return errorOf(UndefinedIdentifier)
 	}
 	if next, err := getNextToken(); err != nil || next.Kind != token.LeftParenthesis {
@@ -508,11 +499,11 @@ func analyzeFunctionCall() *Error {
 	if next, err := getNextToken(); err != nil || next.Kind != token.RightParenthesis {
 		return errorOf(IncompleteFunctionCall)
 	}
-
+	currentFunction.addAnInstruction("call " + string(sb.address))
 	return nil
 }
 
-func analyzeStatement() *Error {
+func analyzeStatement(fun *functionInfo) *Error {
 	// <statement> ::=
 	//		'{' <statement-seq> '}'
 	// 		|<condition-statement>
@@ -527,7 +518,7 @@ func analyzeStatement() *Error {
 	// '{' <statement-seq> '}'
 	next, err := getNextToken()
 	if err == nil && next.Kind == token.LeftBracket {
-		if err := analyzeStatementSeq(); err != nil {
+		if err := analyzeStatementSeq(fun); err != nil {
 			return err
 		}
 		if next, err := getNextToken(); err != nil || next.Kind != token.RightBracket {
@@ -535,10 +526,10 @@ func analyzeStatement() *Error {
 		}
 		return nil
 	}
-	_ = putBackTokens()
+	_ = putBackAToken()
 
 	// <condition-statement>
-	if err := analyzeConditionStatement(); err == nil {
+	if err := analyzeConditionStatement(fun); err == nil {
 		return nil
 	}
 
@@ -575,30 +566,36 @@ func analyzeStatement() *Error {
 
 	// ';'
 	if next, err := getNextToken(); err != nil || next.Kind != token.Semicolon {
+		if err == nil {
+			_ = putBackAToken()
+		}
 		return errorOf(InvalidStatement)
 	}
 
 	return nil
 }
 
-func analyzeStatementSeq() *Error {
+func analyzeStatementSeq(fun *functionInfo) *Error {
 	// {<statement>}
 	for {
-		if err := analyzeStatement; err != nil {
+		if err := analyzeStatement(fun); err != nil {
 			return nil
 		}
 	}
 }
 
-func analyzeCompoundStatement() *Error {
+func analyzeCompoundStatement(fun *functionInfo) *Error {
 	// '{' {<variable-declaration>} <statement-seq> '}'
 	if next, err := getNextToken(); err != nil || next.Kind != token.LeftBracket {
+		if err == nil {
+			_ = putBackAToken()
+		}
 		return errorOf(InvalidStatement)
 	}
-	if err := analyzeVariableDeclarations(); err != nil {
+	if err := analyzeVariableDeclarations(fun); err != nil {
 		return err
 	}
-	if err := analyzeStatementSeq(); err != nil {
+	if err := analyzeStatementSeq(fun); err != nil {
 		return err
 	}
 	if next, err := getNextToken(); err != nil || next.Kind != token.RightBracket {
@@ -607,15 +604,15 @@ func analyzeCompoundStatement() *Error {
 	return nil
 }
 
-func analyzeParameterDeclaration(functionName string) *Error {
+func analyzeParameterDeclaration(fun *functionInfo) *Error {
 	// [<const-qualifier>]<type-specifier><identifier>
 	next, err := getNextToken()
 	if err != nil {
 		return errorOf(InvalidDeclaration)
 	}
-	// isConst := false
+	isConst := false
 	if next.Kind == token.Const {
-		// isConst = true
+		isConst = true
 		next, err = getNextToken()
 		if err != nil {
 			return errorOf(InvalidDeclaration)
@@ -624,21 +621,27 @@ func analyzeParameterDeclaration(functionName string) *Error {
 	if !next.IsATypeSpecifier() {
 		return errorOf(InvalidDeclaration)
 	}
-	// kind := tokenKindToType(next)
+	kind := tokenKindToType(next)
 	next, err = getNextToken()
 	if err != nil || next.Kind != token.Identifier {
 		return errorOf(InvalidDeclaration)
 	}
+	identifier := next.Value.(string)
 
-	// TODO: generate instructions
+	if isConst {
+		_ = fun.symbols.addAVariable(identifier, kind)
+	} else {
+		_ = fun.symbols.addAConstant(identifier, kind, false)
+	}
+	fun.parameters = append(fun.parameters, identifier)
 	return nil
 }
 
-func analyzeParameterDeclarationList(functionName string) *Error {
+func analyzeParameterDeclarationList(fun *functionInfo) *Error {
 	// <parameter-declaration-list> ::= <parameter-declaration>{','<parameter-declaration>}
 
 	// <parameter-declaration>
-	if err := analyzeParameterDeclaration(functionName); err != nil {
+	if err := analyzeParameterDeclaration(fun); err != nil {
 		return err
 	}
 
@@ -649,22 +652,36 @@ func analyzeParameterDeclarationList(functionName string) *Error {
 			return nil
 		}
 		if next.Kind != token.Comma {
-			_ = putBackTokens()
+			_ = putBackAToken()
 			return nil
 		}
-		if err := analyzeParameterDeclaration(functionName); err != nil {
+		if err := analyzeParameterDeclaration(fun); err != nil {
 			return err
 		}
 	}
 }
 
-func analyzeParameterClause(functionName string) *Error {
+func analyzeParameterClause(fun *functionInfo) *Error {
 	// <parameter-clause> ::= '(' [<parameter-declaration-list>] ')'
 	next, err := getNextToken()
 	if err != nil || next.Kind != token.LeftParenthesis {
+		if err == nil {
+			_ = putBackAToken()
+		}
 		return errorOf(InvalidDeclaration)
 	}
-	if err := analyzeParameterDeclarationList(functionName); err != nil {
+
+	next, err = getNextToken()
+	if err != nil {
+		return errorOf(InvalidStatement)
+	}
+	if next.Kind == token.RightParenthesis {
+		return nil
+	} else {
+		_ = putBackAToken()
+	}
+
+	if err := analyzeParameterDeclarationList(fun); err != nil {
 		return err
 	}
 	next, err = getNextToken()
@@ -677,30 +694,38 @@ func analyzeParameterClause(functionName string) *Error {
 func analyzeFunctionDefinition() *Error {
 	// <function-definition> ::= <type-specifier><identifier><parameter-clause><compound-statement>
 
+	currentSymbolTable = &symbolTable{parent: globalSymbolTable, symbols: map[string]symbol{}}
+	currentFunction = &functionInfo{symbols: currentSymbolTable}
+
 	next, err := getNextToken()
 	if err != nil || !next.IsATypeSpecifier() {
+		if err == nil {
+			_ = putBackAToken()
+		}
 		return errorOf(InvalidDeclaration)
 	}
-	// kind := next.Kind
+	kind := next.Kind
 	next, err = getNextToken()
 	if err != nil || next.Kind != token.Identifier {
+		_ = putBackAToken()
 		return errorOf(InvalidDeclaration)
 	}
 	identifier := next.Value.(string)
-	if err := analyzeParameterClause(identifier); err != nil {
+	if err := analyzeParameterClause(currentFunction); err != nil {
 		return err
 	}
-	if err := analyzeCompoundStatement(); err != nil {
+	if err := analyzeCompoundStatement(currentFunction); err != nil {
 		return err
 	}
-	// TODO: generate definition
-	return nil
+
+	// TODO: connect currentFunction and currentSymbolTable with the line below
+	return globalSymbolTable.addAFunction(identifier, kind)
 }
 
 func analyzeFunctionDefinitions() *Error {
 	for {
 		next, err := getNextToken()
-		_ = putBackTokens()
+		_ = putBackAToken()
 		if err != nil || !next.IsATypeSpecifier() {
 			return nil
 		}
@@ -713,9 +738,14 @@ func analyzeFunctionDefinitions() *Error {
 func Run(parser *Parser, writer *bufio.Writer, shouldCompileToBinary bool) {
 	globalParser, globalWriter = parser, writer
 	globalSymbolTable = initGlobalSymbolTable()
+	globalStart = &functionInfo{
+		symbols:      globalSymbolTable,
+		instructions: []string{},
+	}
 	currentSymbolTable = globalSymbolTable
+	currentFunction = globalStart
 
-	if err := analyzeVariableDeclarations(); err != nil {
+	if err := analyzeVariableDeclarations(nil); err != nil {
 		reportFatalError(err)
 	}
 	if err := analyzeFunctionDefinitions(); err != nil {
