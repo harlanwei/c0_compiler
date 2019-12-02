@@ -24,13 +24,13 @@ func getNextToken() (res *Token, err error) {
 	return
 }
 
-// TODO: change `putBackAToken` to `resetTo` for easier implementations
-func putBackAToken() *Error {
-	if prev := globalParser.UnreadToken(); prev != nil {
-		globalLineCount, globalColumnCount = prev.Line, prev.Column
-		return nil
-	}
-	return errorOf(Bug)
+func getCurrentPos() int {
+	return globalParser.CurrentHead()
+}
+
+func resetHeadTo(pos int) {
+	thatToken := globalParser.ResetHeadTo(pos)
+	globalColumnCount, globalLineCount = thatToken.Column, thatToken.Line
 }
 
 // Print all the tokens the parser generated directly to stdout.

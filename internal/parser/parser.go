@@ -26,13 +26,22 @@ func (p *Parser) NextToken() (res *Token) {
 	return
 }
 
-// Returns nil when no more tokens can be put back into the buffer.
-func (p *Parser) UnreadToken() (res *Token) {
-	if p.pos == 0 {
-		return nil
+func (p *Parser) CurrentHead() int {
+	return p.pos
+}
+
+func (p *Parser) ResetHeadTo(pos int) *Token {
+	p.pos = pos
+	if p.HasNextToken() {
+		return &p.buffer[p.pos]
+	} else {
+		return &Token{
+			Kind:   0,
+			Value:  nil,
+			Line:   0,
+			Column: 0,
+		}
 	}
-	p.pos--
-	return &p.buffer[p.pos]
 }
 
 type parserError struct {
