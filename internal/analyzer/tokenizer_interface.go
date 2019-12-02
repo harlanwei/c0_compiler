@@ -24,6 +24,7 @@ func getNextToken() (res *Token, err error) {
 	return
 }
 
+// TODO: change `putBackAToken` to `resetTo` for easier implementations
 func putBackAToken() *Error {
 	if prev := globalParser.UnreadToken(); prev != nil {
 		globalLineCount, globalColumnCount = prev.Line, prev.Column

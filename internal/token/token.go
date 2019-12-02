@@ -68,3 +68,15 @@ func (t *Token) IsARelationalOperator() bool {
 	}
 	return false
 }
+
+func (t *Token) IsAnUnaryOperator() bool {
+	return t.Kind == PlusSign || t.Kind == MinusSign
+}
+
+func (t *Token) IsAMultiplicativeOperator() bool {
+	return t.Kind == MultiplicationSign || t.Kind == DivisionSign
+}
+
+func (t *Token) IsAnAdditiveOperator() bool {
+	return t.Kind == PlusSign || t.Kind == MinusSign
+}

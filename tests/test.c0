@@ -4,6 +4,7 @@ void fn() {
     int b = 1023;
     int c = 0x4f;
     if (a + 4 <= b) {
-
+        a = 6;
     }
+    fn();
 }
