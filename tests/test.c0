@@ -8,3 +8,11 @@ void fn() {
     }
     fn();
 }
+
+void main() {
+    fn();
+}
+
+void fn2(int c) {
+    main();
+}

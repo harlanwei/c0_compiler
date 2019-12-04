@@ -5,22 +5,30 @@ import (
 )
 
 type Symbol struct {
+	Name       string
 	Kind       int
 	IsConstant bool
 	IsCallable bool
 	Address    int
-	Appendix   interface{}
+	FnInfo     *Fn
 }
 
 type SymbolTable struct {
 	Symbols         map[string]Symbol
 	Parent          *SymbolTable
 	RelatedFunction *Fn
+	fnCount         int
 }
 
 func (st SymbolTable) HasDeclared(name string) bool {
 	_, ok := st.Symbols[name]
 	return ok
+}
+
+func (st *SymbolTable) nextFnCount() (res int) {
+	res = st.fnCount
+	st.fnCount++
+	return
 }
 
 func (st SymbolTable) GetSymbolNamed(name string) *Symbol {
@@ -59,11 +67,12 @@ func (st SymbolTable) AddAConstant(name string, kind int) *Error {
 		return cc0_error.Of(cc0_error.RedeclaredAnIdentifier)
 	}
 	st.Symbols[name] = Symbol{
+		Name:       name,
 		Kind:       kind,
 		IsConstant: true,
 		IsCallable: false,
 		Address:    st.RelatedFunction.NextMemorySlot(),
-		Appendix:   nil,
+		FnInfo:     nil,
 	}
 	return nil
 }
@@ -73,11 +82,12 @@ func (st SymbolTable) AddAVariable(name string, kind int) *Error {
 		return cc0_error.Of(cc0_error.RedeclaredAnIdentifier)
 	}
 	st.Symbols[name] = Symbol{
+		Name:       name,
 		Kind:       kind,
 		IsConstant: false,
 		IsCallable: false,
 		Address:    st.RelatedFunction.NextMemorySlot(),
-		Appendix:   nil,
+		FnInfo:     nil,
 	}
 	return nil
 }
@@ -104,11 +114,12 @@ func (st *SymbolTable) AddAFunction(name string, returnType int) *Error {
 		return cc0_error.Of(cc0_error.RedeclaredAnIdentifier)
 	}
 	st.Symbols[name] = Symbol{
+		Name:       name,
 		Kind:       returnType,
 		IsConstant: true,
 		IsCallable: true,
-		Address:    0,
-		Appendix:   nil,
+		Address:    st.nextFnCount(),
+		FnInfo:     InitFn(),
 	}
 	return nil
 }

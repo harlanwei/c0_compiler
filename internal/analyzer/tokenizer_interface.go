@@ -10,18 +10,18 @@ import (
 type Parser = parser.Parser
 type Token = token.Token
 
-var globalLineCount = 0
-var globalColumnCount = 0
+var currentLine = 0
+var currentColumn = 0
 
 // The only error this function will throw is NoMoreTokens so it's safe to check `err != nil` directly without
 // specifying the kind of error.
 func getNextToken() (res *Token, err error) {
 	if !globalParser.HasNextToken() {
-		res, err = nil, cc0_error.Of(cc0_error.NoMoreTokens).On(globalLineCount, globalColumnCount)
+		res, err = nil, cc0_error.Of(cc0_error.NoMoreTokens).On(currentLine, currentColumn)
 		return
 	}
 	res, err = globalParser.NextToken(), nil
-	globalLineCount, globalColumnCount = res.Line, res.Column
+	currentLine, currentColumn = res.Line, res.Column
 	return
 }
 
@@ -31,7 +31,7 @@ func getCurrentPos() int {
 
 func resetHeadTo(pos int) {
 	thatToken := globalParser.ResetHeadTo(pos)
-	globalColumnCount, globalLineCount = thatToken.Column, thatToken.Line
+	currentColumn, currentLine = thatToken.Column, thatToken.Line
 }
 
 // Print all the tokens the parser generated directly to stdout.

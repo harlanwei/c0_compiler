@@ -1,7 +1,12 @@
 package main
 
 import (
+	"bufio"
+	"c0_compiler/internal/analyzer"
+	"c0_compiler/internal/assembler"
+	"c0_compiler/internal/cc0_error"
 	"c0_compiler/internal/compiler"
+	"c0_compiler/internal/parser"
 	"flag"
 	"fmt"
 	"os"
@@ -48,10 +53,48 @@ func main() {
 		source = remainingArgs[0]
 	}
 
-	if *shouldOutputBinary {
-		compiler.Run(source, *destination, true, false)
-	} else if *shouldOutputText {
-		compiler.Run(source, *destination, false, *isDebugging)
+	reader, err := os.Open(source)
+	if err != nil {
+		cc0_error.PrintfToStdErr("Can't open specified source file: %s\n", source)
+		cc0_error.ThrowAndExit(cc0_error.Source)
+	}
+	defer func() {
+		if err := reader.Close(); err != nil {
+			panic(err)
+		}
+	}()
+	scanner := bufio.NewScanner(reader)
+	p := parser.Parse(scanner)
+	globalSymbolTable := analyzer.Run(p)
+	lines := assembler.Run(globalSymbolTable)
+
+	var outfile *os.File
+	if *isDebugging {
+		outfile = os.Stdout
+	} else {
+		outfile, err = os.Create(*destination)
+		if err != nil {
+			panic(err)
+		}
+	}
+	defer func() {
+		if err := outfile.Close(); err != nil {
+			panic(err)
+		}
+	}()
+	w := bufio.NewWriter(outfile)
+
+	if *shouldOutputText {
+		for _, line := range *lines {
+			if _, err := w.WriteString(line); err != nil {
+				panic(err)
+			}
+		}
+		if err := w.Flush(); err != nil {
+			panic(err)
+		}
+	} else if *shouldOutputBinary {
+		compiler.Run(lines, w)
 	} else {
 		displayUsage(true)
 	}

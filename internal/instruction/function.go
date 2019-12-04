@@ -39,12 +39,23 @@ func (f *Fn) GetCurrentOffset() int {
 	return f.instructions.offset
 }
 
+func (f *Fn) GetPreviousLine() *Line {
+	lines := *f.instructions.lines
+	return &(lines[len(lines)-2])
+}
+
+func (f *Fn) GetCurrentLine() *Line {
+	lines := *f.instructions.lines
+	return &(lines[len(lines)-1])
+}
+
 func (f *Fn) Append(instruction int, operands ...int) {
 	i := GetInstruction(instruction)
 	if !i.IsValidInstruction(operands...) {
 		os.Exit(-1)
 	}
-	*f.instructions.lines = append(*f.instructions.lines, Line{i: i, operands: &operands})
+	f.instructions.offset += i.offset
+	*f.instructions.lines = append(*f.instructions.lines, Line{I: i, Operands: &operands})
 }
 
 func (f *Fn) NextMemorySlot() (slot int) {

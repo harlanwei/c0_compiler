@@ -9,6 +9,7 @@ const (
 	Source = iota
 	Parser
 	Analyzer
+	Assembler
 )
 
 func ReportLineAndColumn(line, column int) {
@@ -36,6 +37,8 @@ func throw(source int) {
 		sourceMessage = "Parser encountered a problem. See output messages above."
 	case Analyzer:
 		sourceMessage = "Incorrect syntax encountered. See output messages above."
+	case Assembler:
+		sourceMessage = "Failed to assemble."
 	}
 	PrintlnToStdErr(sourceMessage)
 }
@@ -63,6 +66,7 @@ const (
 	InvalidStatement
 	IncompleteFunctionCall
 	UndefinedIdentifier
+	NoMain
 )
 
 type Error struct {
@@ -81,8 +85,13 @@ func (error *Error) On(line, column int) *Error {
 	return error
 }
 
-func (error *Error) Fatal(from int) {
+func (error *Error) DieAndReportPosition(from int) {
 	ReportLineAndColumn(error.line, error.column)
+	PrintlnToStdErr(error.Error())
+	ThrowAndExit(from)
+}
+
+func (error *Error) Die(from int) {
 	PrintlnToStdErr(error.Error())
 	ThrowAndExit(from)
 }
@@ -90,24 +99,26 @@ func (error *Error) Fatal(from int) {
 func (error *Error) Error() string {
 	switch error.code {
 	case IncompleteVariableDeclaration:
-		return "the variable declaration is incomplete."
+		return "The variable declaration is incomplete."
 	case InvalidDeclaration:
-		return "the declaration is not complying with the syntax."
+		return "The declaration is not complying with the syntax."
 	case Bug:
-		return "there is a bug in the analyzer."
+		return "There is a bug in the analyzer."
 	case IncompleteExpression:
-		return "the expression is not complete."
+		return "The expression is not complete."
 	case IllegalExpression:
-		return "unexpected components in the expression."
+		return "Unexpected components in the expression."
 	case RedeclaredAnIdentifier:
-		return "an identifier cannot be redeclared."
+		return "An identifier cannot be redeclared."
 	case InvalidStatement:
-		return "encountered an illegal statement."
+		return "Encountered an illegal statement."
 	case IncompleteFunctionCall:
-		return "the function call is not complete."
+		return "The function call is not complete."
 	case UndefinedIdentifier:
-		return "cannot use an undefined identifier."
+		return "Cannot use an undefined identifier."
+	case NoMain:
+		return "No main function is defined."
 	default:
-		return "an unknown error occurred."
+		return "An unknown error occurred."
 	}
 }
