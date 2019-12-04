@@ -38,7 +38,7 @@ func assembleConstants(st *instruction.SymbolTable) {
 func assembleFunctions() {
 	appendLine(".functions:\n")
 	for index, sb := range *sortedFunctions {
-		appendLine("%d %d %d 1\n", index, index, len(*sb.FnInfo.Parameters))
+		appendLine("%d %d %d 1\t# %s\n", index, index, len(*sb.FnInfo.Parameters), sb.Name)
 	}
 	appendEmptyLine()
 }
