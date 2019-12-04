@@ -51,3 +51,63 @@ func ThrowAndExit(source int) {
 	throw(source)
 	os.Exit(source)
 }
+
+const (
+	Bug = iota
+	NoMoreTokens
+	IncompleteVariableDeclaration
+	InvalidDeclaration
+	IncompleteExpression
+	IllegalExpression
+	RedeclaredAnIdentifier
+	InvalidStatement
+	IncompleteFunctionCall
+	UndefinedIdentifier
+)
+
+type Error struct {
+	code   int
+	line   int
+	column int
+}
+
+func Of(code int) *Error {
+	return &Error{code, 0, 0}
+}
+
+func (error *Error) On(line, column int) *Error {
+	error.line = line
+	error.column = column
+	return error
+}
+
+func (error *Error) Fatal(from int) {
+	ReportLineAndColumn(error.line, error.column)
+	PrintlnToStdErr(error.Error())
+	ThrowAndExit(from)
+}
+
+func (error *Error) Error() string {
+	switch error.code {
+	case IncompleteVariableDeclaration:
+		return "the variable declaration is incomplete."
+	case InvalidDeclaration:
+		return "the declaration is not complying with the syntax."
+	case Bug:
+		return "there is a bug in the analyzer."
+	case IncompleteExpression:
+		return "the expression is not complete."
+	case IllegalExpression:
+		return "unexpected components in the expression."
+	case RedeclaredAnIdentifier:
+		return "an identifier cannot be redeclared."
+	case InvalidStatement:
+		return "encountered an illegal statement."
+	case IncompleteFunctionCall:
+		return "the function call is not complete."
+	case UndefinedIdentifier:
+		return "cannot use an undefined identifier."
+	default:
+		return "an unknown error occurred."
+	}
+}

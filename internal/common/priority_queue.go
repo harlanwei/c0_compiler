@@ -1,4 +1,4 @@
-package analyzer
+package common
 
 type PriorityQueue []int
 

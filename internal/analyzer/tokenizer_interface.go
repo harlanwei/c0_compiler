@@ -1,6 +1,7 @@
 package analyzer
 
 import (
+	"c0_compiler/internal/cc0_error"
 	"c0_compiler/internal/parser"
 	"c0_compiler/internal/token"
 	"fmt"
@@ -16,7 +17,7 @@ var globalColumnCount = 0
 // specifying the kind of error.
 func getNextToken() (res *Token, err error) {
 	if !globalParser.HasNextToken() {
-		res, err = nil, &Error{NoMoreTokens, globalLineCount, globalColumnCount}
+		res, err = nil, cc0_error.Of(cc0_error.NoMoreTokens).On(globalLineCount, globalColumnCount)
 		return
 	}
 	res, err = globalParser.NextToken(), nil
