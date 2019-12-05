@@ -1,0 +1,40 @@
+.start:
+ipush 0
+ipush 3
+istore
+
+.constants:
+0 S "fn"
+1 S "main"
+2 S "fn2"
+
+.functions:
+0 0 0 1	# fn
+1 1 0 1	# main
+2 2 1 1	# fn2
+
+.F0:	# fn
+ipush 0
+ipush 1023
+istore
+ipush 1
+ipush 79
+istore
+ipush 0
+iload
+ipush 4
+iadd
+ipush 0
+iload
+icmp
+jg 55
+ipush 0
+ipush 6
+istore
+call 0
+
+.F1:	# main
+call 0
+
+.F2:	# fn2
+call 1

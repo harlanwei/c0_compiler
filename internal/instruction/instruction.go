@@ -68,21 +68,22 @@ type Instruction struct {
 	Representation string
 	nOperands      int
 	offset         int
+	Operands       []int
 }
 
 var Instructions = map[int]Instruction{
 	Nop:          {Code: Nop, Representation: "nop", nOperands: 0, offset: 1},
-	Bipush:       {Code: Bipush, Representation: "bipush", nOperands: 1, offset: 2},
-	Ipush:        {Code: Ipush, Representation: "ipush", nOperands: 1, offset: 5},
+	Bipush:       {Code: Bipush, Representation: "bipush", nOperands: 1, offset: 2, Operands: []int{1}},
+	Ipush:        {Code: Ipush, Representation: "ipush", nOperands: 1, offset: 5, Operands: []int{4}},
 	Pop:          {Code: Pop, Representation: "pop", nOperands: 0, offset: 1},
 	Pop2:         {Code: Pop2, Representation: "pop2", nOperands: 0, offset: 1},
-	Popn:         {Code: Popn, Representation: "popn", nOperands: 1, offset: 5},
+	Popn:         {Code: Popn, Representation: "popn", nOperands: 1, offset: 5, Operands: []int{4}},
 	Dup:          {Code: Dup, Representation: "dup", nOperands: 0, offset: 1},
 	Dup2:         {Code: Dup2, Representation: "dup2", nOperands: 0, offset: 1},
-	Loadc:        {Code: Loadc, Representation: "loadc", nOperands: 1, offset: 3},
-	Loada:        {Code: Loada, Representation: "loada", nOperands: 2, offset: 7},
+	Loadc:        {Code: Loadc, Representation: "loadc", nOperands: 1, offset: 3, Operands: []int{2}},
+	Loada:        {Code: Loada, Representation: "loada", nOperands: 2, offset: 7, Operands: []int{2, 4}},
 	New:          {Code: New, Representation: "new", nOperands: 0, offset: 1},
-	Snew:         {Code: Snew, Representation: "snew", nOperands: 1, offset: 5},
+	Snew:         {Code: Snew, Representation: "snew", nOperands: 1, offset: 5, Operands: []int{4}},
 	Iload:        {Code: Iload, Representation: "iload", nOperands: 0, offset: 1},
 	Dload:        {Code: Dload, Representation: "dload", nOperands: 0, offset: 1},
 	Aload:        {Code: Aload, Representation: "aload", nOperands: 0, offset: 1},
@@ -110,14 +111,14 @@ var Instructions = map[int]Instruction{
 	I2d:          {Code: I2d, Representation: "i2d", nOperands: 0, offset: 1},
 	D2i:          {Code: D2i, Representation: "d2i", nOperands: 0, offset: 1},
 	I2c:          {Code: I2c, Representation: "i2c", nOperands: 0, offset: 1},
-	Jmp:          {Code: Jmp, Representation: "jmp", nOperands: 1, offset: 3},
-	Je:           {Code: Je, Representation: "je", nOperands: 1, offset: 3},
-	Jne:          {Code: Jne, Representation: "jne", nOperands: 1, offset: 3},
-	Jl:           {Code: Jl, Representation: "jl", nOperands: 1, offset: 3},
-	Jge:          {Code: Jge, Representation: "jge", nOperands: 1, offset: 3},
-	Jg:           {Code: Jg, Representation: "jg", nOperands: 1, offset: 3},
-	Jle:          {Code: Jle, Representation: "jle", nOperands: 1, offset: 3},
-	Call:         {Code: Call, Representation: "call", nOperands: 1, offset: 3},
+	Jmp:          {Code: Jmp, Representation: "jmp", nOperands: 1, offset: 3, Operands: []int{2}},
+	Je:           {Code: Je, Representation: "je", nOperands: 1, offset: 3, Operands: []int{2}},
+	Jne:          {Code: Jne, Representation: "jne", nOperands: 1, offset: 3, Operands: []int{2}},
+	Jl:           {Code: Jl, Representation: "jl", nOperands: 1, offset: 3, Operands: []int{2}},
+	Jge:          {Code: Jge, Representation: "jge", nOperands: 1, offset: 3, Operands: []int{2}},
+	Jg:           {Code: Jg, Representation: "jg", nOperands: 1, offset: 3, Operands: []int{2}},
+	Jle:          {Code: Jle, Representation: "jle", nOperands: 1, offset: 3, Operands: []int{2}},
+	Call:         {Code: Call, Representation: "call", nOperands: 1, offset: 3, Operands: []int{2}},
 	Ret:          {Code: Ret, Representation: "ret", nOperands: 0, offset: 1},
 	Iret:         {Code: Iret, Representation: "iret", nOperands: 0, offset: 1},
 	Dret:         {Code: Dret, Representation: "dret", nOperands: 0, offset: 1},
@@ -135,6 +136,15 @@ var Instructions = map[int]Instruction{
 
 func GetInstruction(code int) Instruction {
 	return Instructions[code]
+}
+
+func GetCodeFrom(representation string) *Instruction {
+	for _, i := range Instructions {
+		if i.Representation == representation {
+			return &i
+		}
+	}
+	return nil
 }
 
 func (instruction Instruction) IsValidInstruction(operands ...int) bool {

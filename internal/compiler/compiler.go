@@ -2,10 +2,13 @@ package compiler
 
 import (
 	"bufio"
+	"c0_compiler/internal/instruction"
 	"regexp"
 	"strconv"
 	"strings"
 )
+
+// TODO: fix current buggy implementation with lines
 
 // Constants
 var magics = []byte{0x43, 0x30, 0x3a, 0x29}
@@ -98,8 +101,14 @@ func writeConstants() {
 }
 
 func writeInstruction(n int) {
-	// line := allLines[n]
-	// TODO
+	line := allLines[n]
+	fields := strings.Split(line, " ")
+	currentInstruction := instruction.GetCodeFrom(fields[0])
+	writeValueWithWidth(currentInstruction.Code, 1)
+	for i := 1; i < len(fields); i++ {
+		v, _ := strconv.Atoi(fields[i])
+		writeValueWithWidth(v, currentInstruction.Operands[i-1])
+	}
 }
 
 func writeStart() {
@@ -130,21 +139,26 @@ func Run(lines *[]string, destination *bufio.Writer) {
 	allLines = *lines
 
 	for hasNextLine() {
-		line := *peekNextLine()
+		var line string
 		if isAnEmptyLine() {
 			nextLine()
-		} else if strings.TrimSpace(line)[0] != '.' {
+		} else {
+			line = strings.TrimSpace(*peekNextLine())
+		}
+		if line[0] != '.' {
 			// TODO: in real implementation, switch to: panic("Unparsed line: " + line)
 			nextLine()
-		} else if line == ".constants" {
+		} else if line == ".constants:" {
 			nextLine()
 			writeConstants()
 		} else if line == ".start:" {
 			nextLine()
 			writeStart()
-		} else if functionMatcher.MatchString(line) {
+		} else if line == ".functions:" {
 			nextLine()
 			writeFunctionBriefings()
+		} else if functionMatcher.MatchString(line) {
+			nextLine()
 		} else {
 			// TODO: in real implementation, switch to: panic("Unparsed line: " + line)
 			nextLine()
