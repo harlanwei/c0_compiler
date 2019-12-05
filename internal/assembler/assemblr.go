@@ -19,9 +19,9 @@ func appendEmptyLine() {
 }
 
 func printLine(line instruction.Line) {
-	appendLine("%s ", line.I.Representation)
+	appendLine("%s", line.I.Representation)
 	for _, operand := range *line.Operands {
-		appendLine("%d ", operand)
+		appendLine(" %d", operand)
 	}
 	appendEmptyLine()
 }
@@ -40,7 +40,6 @@ func assembleFunctions() {
 	for index, sb := range *sortedFunctions {
 		appendLine("%d %d %d 1\t# %s\n", index, index, len(*sb.FnInfo.Parameters), sb.Name)
 	}
-	appendEmptyLine()
 }
 
 type By func(p1, p2 *instruction.Symbol) bool
@@ -88,14 +87,15 @@ func Run(globalSymbolTable *instruction.SymbolTable) *[]string {
 		cc0_error.Of(cc0_error.NoMain).Die(cc0_error.Assembler)
 	}
 
-	sortFunctions(globalSymbolTable)
-	assembleConstants(globalSymbolTable)
-	assembleFunctions()
-
 	appendLine(".start:\n")
 	for _, i := range *globalSymbolTable.RelatedFunction.GetLines() {
 		printLine(i)
 	}
+	appendEmptyLine()
+
+	sortFunctions(globalSymbolTable)
+	assembleConstants(globalSymbolTable)
+	assembleFunctions()
 
 	for name, sb := range globalSymbolTable.Symbols {
 		if !sb.IsCallable {

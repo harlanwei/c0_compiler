@@ -70,7 +70,7 @@ type Instruction struct {
 	offset         int
 }
 
-var instructions = map[int]Instruction{
+var Instructions = map[int]Instruction{
 	Nop:          {Code: Nop, Representation: "nop", nOperands: 0, offset: 1},
 	Bipush:       {Code: Bipush, Representation: "bipush", nOperands: 1, offset: 2},
 	Ipush:        {Code: Ipush, Representation: "ipush", nOperands: 1, offset: 5},
@@ -134,7 +134,7 @@ var instructions = map[int]Instruction{
 }
 
 func GetInstruction(code int) Instruction {
-	return instructions[code]
+	return Instructions[code]
 }
 
 func (instruction Instruction) IsValidInstruction(operands ...int) bool {

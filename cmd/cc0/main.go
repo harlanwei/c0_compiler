@@ -90,12 +90,12 @@ func main() {
 				panic(err)
 			}
 		}
-		if err := w.Flush(); err != nil {
-			panic(err)
-		}
 	} else if *shouldOutputBinary {
 		compiler.Run(lines, w)
 	} else {
 		displayUsage(true)
+	}
+	if err := w.Flush(); err != nil {
+		panic(err)
 	}
 }
