@@ -12,6 +12,10 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+out
+out.txt
+*.s0
+*.o0
 
 # ========================================================================
 

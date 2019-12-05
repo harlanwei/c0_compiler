@@ -19,11 +19,11 @@ func appendEmptyLine() {
 }
 
 func printLine(line instruction.Line) {
-	appendLine("%s", line.I.Representation)
+	str := line.I.Representation
 	for _, operand := range *line.Operands {
-		appendLine(" %d", operand)
+		str += fmt.Sprintf(" %d", operand)
 	}
-	appendEmptyLine()
+	appendLine("%s\n", str)
 }
 
 func assembleConstants(st *instruction.SymbolTable) {
@@ -87,14 +87,15 @@ func Run(globalSymbolTable *instruction.SymbolTable) *[]string {
 		cc0_error.Of(cc0_error.NoMain).Die(cc0_error.Assembler)
 	}
 
+	sortFunctions(globalSymbolTable)
+	assembleConstants(globalSymbolTable)
+
 	appendLine(".start:\n")
 	for _, i := range *globalSymbolTable.RelatedFunction.GetLines() {
 		printLine(i)
 	}
 	appendEmptyLine()
-
-	sortFunctions(globalSymbolTable)
-	assembleConstants(globalSymbolTable)
+	
 	assembleFunctions()
 
 	for name, sb := range globalSymbolTable.Symbols {

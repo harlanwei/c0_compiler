@@ -60,7 +60,6 @@ const (
 	Iscan        = 0xb0
 	Dscan        = 0xb1
 	Cscan        = 0xb2
-	AnalyzerCall = 0xffff // for call instructions before assembling
 )
 
 type Instruction struct {
@@ -131,7 +130,6 @@ var Instructions = map[int]Instruction{
 	Iscan:        {Code: Iscan, Representation: "iscan", nOperands: 0, offset: 1},
 	Dscan:        {Code: Dscan, Representation: "dscan", nOperands: 0, offset: 1},
 	Cscan:        {Code: Cscan, Representation: "cscan", nOperands: 0, offset: 1},
-	AnalyzerCall: {Code: AnalyzerCall, Representation: "#", nOperands: 1, offset: 3},
 }
 
 func GetInstruction(code int) Instruction {
