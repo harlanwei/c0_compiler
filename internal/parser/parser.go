@@ -9,6 +9,8 @@ import (
 	"unicode"
 )
 
+var isInACommentBlock = false
+
 type Token = token.Token
 
 type Parser struct {
@@ -217,7 +219,7 @@ func isDigitOrLetter(character rune) bool {
 
 func isAnOperatorWithTwoCharacters(operator string) bool {
 	switch operator {
-	case "<=", ">=", "==", "!=":
+	case "<=", ">=", "==", "!=", "//", "/*", "*/":
 		return true
 	}
 	return false
@@ -227,6 +229,7 @@ func divideTokens(lineCount int, line string, buffer *[]Token) {
 	columnCount := 0
 	for columnCount < len(line) {
 		character := rune(line[columnCount])
+
 		if unicode.IsSpace(character) {
 			columnCount++
 			continue
@@ -244,13 +247,35 @@ func divideTokens(lineCount int, line string, buffer *[]Token) {
 			}
 		}
 
-		*buffer = append(*buffer, Token{
-			Kind:   token.NotParsed,
-			Value:  line[columnCount:end],
-			Line:   lineCount,
-			Column: columnCount + 1,
-		})
+		currentTokenString := line[columnCount:end]
 		columnCount = end
+
+		if currentTokenString == "//" {
+			// Discard rest of this line
+			return
+		}
+
+		if currentTokenString == "/*" {
+			isInACommentBlock = true
+			continue
+		} else if currentTokenString == "*/" {
+			if !isInACommentBlock {
+				cc0_error.ReportLineAndColumn(lineCount, columnCount)
+				cc0_error.PrintlnToStdErr("encountered an illegal comment block.")
+				cc0_error.ThrowAndExit(cc0_error.Parser)
+			}
+			isInACommentBlock = false
+			continue
+		}
+
+		if !isInACommentBlock {
+			*buffer = append(*buffer, Token{
+				Kind:   token.NotParsed,
+				Value:  currentTokenString,
+				Line:   lineCount,
+				Column: columnCount + 1,
+			})
+		}
 	}
 }
 

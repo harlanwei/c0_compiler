@@ -1,5 +1,8 @@
 int a = 3;
 
+/**
+ * A test function.
+ */
 void fn() {
     int b = 1023;
     int c = 0x4f;
