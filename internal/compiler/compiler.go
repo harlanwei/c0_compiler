@@ -3,10 +3,13 @@ package compiler
 import (
 	"bufio"
 	"c0_compiler/internal/instruction"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
 )
+
+const lower32BitsMask = (1 >> 32) - 1
 
 // Constants
 var magics = []byte{0x43, 0x30, 0x3a, 0x29}
@@ -68,8 +71,8 @@ func writeI32WithWidth(value, width int) {
 		padded = append(padded, 0)
 	}
 	for i := width - 1; i >= 0; i-- {
-		padded[i] = byte(value % 0xff)
-		value /= 0xff
+		padded[i] = byte(value & 0xff)
+		value >>= 8
 	}
 	_, _ = w.Write(padded)
 }
@@ -81,8 +84,11 @@ func writeConstant(line string) {
 		literal, _ := strconv.Atoi(value)
 		writeI32WithWidth(literal, 4)
 	} else if kind == "D" {
-		// TODO
-		panic("Not implemented")
+		v, _ := strconv.ParseFloat(value, 64)
+		vBitsAsUInt64 := math.Float64bits(v)
+		higher32Bits, lower32Bits := int(vBitsAsUInt64>>32), int(vBitsAsUInt64&lower32BitsMask)
+		writeI32WithWidth(higher32Bits, 4)
+		writeI32WithWidth(lower32Bits, 4)
 	} else if kind == "S" {
 		writeI32WithWidth(0, 1)
 		writeI32WithWidth(len(value)-2, 2)

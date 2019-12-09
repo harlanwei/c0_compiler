@@ -31,7 +31,16 @@ func assembleConstants(st *instruction.SymbolTable) {
 	for index, sb := range *sortedFunctions {
 		appendLine("%d S \"%s\"\n", index, sb.Name)
 	}
-	// TODO: add support for int and double constants
+	// addressOffset := len(*sortedFunctions)
+	for _, c := range *st.Constants {
+		// address := c.Address + addressOffset
+		switch c.Kind {
+		case instruction.ConstantKindInt:
+		case instruction.ConstantKindDouble:
+		case instruction.ConstantKindString:
+			// TODO
+		}
+	}
 	appendEmptyLine()
 }
 
@@ -95,7 +104,7 @@ func Run(globalSymbolTable *instruction.SymbolTable) *[]string {
 		printLine(i)
 	}
 	appendEmptyLine()
-	
+
 	assembleFunctions()
 
 	for name, sb := range globalSymbolTable.Symbols {

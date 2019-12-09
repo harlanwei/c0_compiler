@@ -384,6 +384,7 @@ func analyzeReturnStatement() *Error {
 		resetHeadTo(pos)
 		return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
 	}
+	// TODO: generate instructions
 	return nil
 }
 
