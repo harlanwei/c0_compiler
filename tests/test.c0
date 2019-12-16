@@ -1,21 +1,19 @@
-int a = 3;
-
 /**
  * A test function.
  */
 void fn() {
-    int b = 1023;
-    int c = 0x4f;
-    if (a + 4 <= b) {
-        a = 6;
+    int i;
+    int limit = 10;
+    scan(i);
+    while (i < limit) {
+        print(i);
+        i = i + 1;
     }
-    fn();
+    print(6661);
+    return;
 }
 
 void main() {
     fn();
-}
-
-void fn2(int c) {
-    main();
+    return;
 }

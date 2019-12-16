@@ -4,7 +4,6 @@ import (
 	"c0_compiler/internal/cc0_error"
 	"c0_compiler/internal/common"
 	"container/heap"
-	"os"
 )
 
 type Error = cc0_error.Error
@@ -19,6 +18,7 @@ type Fn struct {
 	instructions     *FnInstructions
 	Parameters       *[]string
 	emptyMemorySlots *PriorityQueue
+	stackSize        int
 }
 
 func InitFn() (res *Fn) {
@@ -36,7 +36,7 @@ func (f *Fn) GetLines() *[]Line {
 }
 
 func (f *Fn) GetCurrentOffset() int {
-	return f.instructions.offset
+	return len(*f.instructions.lines)
 }
 
 func (f *Fn) GetPreviousLine() *Line {
@@ -51,8 +51,10 @@ func (f *Fn) GetCurrentLine() *Line {
 
 func (f *Fn) Append(instruction int, operands ...int) {
 	i := GetInstruction(instruction)
+	f.stackSize += i.changesToStackSize
 	if !i.IsValidInstruction(operands...) {
-		os.Exit(-1)
+		cc0_error.PrintfToStdErr("Incorrect usage of instruction 0x%x!\n", instruction)
+		cc0_error.ThrowAndExit(cc0_error.Analyzer)
 	}
 	f.instructions.offset += i.offset
 	*f.instructions.lines = append(*f.instructions.lines, Line{I: i, Operands: &operands})
@@ -65,4 +67,8 @@ func (f *Fn) NextMemorySlot() (slot int) {
 		queue.Push(slot + 1)
 	}
 	return
+}
+
+func (f *Fn) PopStack(reservedSize int) {
+	f.Append(Popn, f.stackSize-reservedSize)
 }

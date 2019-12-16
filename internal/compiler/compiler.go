@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const lower32BitsMask = (1 >> 32) - 1
+const lower32BitsMask = 0xffffffff
 
 // Constants
 var magics = []byte{0x43, 0x30, 0x3a, 0x29}

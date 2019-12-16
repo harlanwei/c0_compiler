@@ -155,7 +155,7 @@ func analyzeFunctionCall() *Error {
 		resetHeadTo(pos)
 		return cc0_error.Of(cc0_error.IncompleteFunctionCall).On(currentLine, currentColumn)
 	}
-	// TODO: check parameters
+	// TODO: check parameters and push them on the stack
 	_ = analyzeExpressionList()
 	if next, err := getNextToken(); err != nil || next.Kind != token.RightParenthesis {
 		resetHeadTo(pos)
@@ -233,19 +233,18 @@ func analyzeConditionStatement() *Error {
 		return err
 	}
 	ifOffset := currentFunction.GetCurrentOffset()
+	conditionalJumpLine.SetFirstOperandTo(ifOffset)
 
 	pos = getCurrentPos()
 	if next, err := getNextToken(); err != nil || next.Kind != token.Else {
 		resetHeadTo(pos)
-		conditionalJumpLine.SetFirstOperandTo(ifOffset)
 		return nil
 	}
-	// TODO: generate jump instructions for `else`
+
 	if err := analyzeStatement(); err != nil {
 		resetHeadTo(pos)
 		return err
 	}
-
 	return nil
 }
 
@@ -310,7 +309,7 @@ func analyzeIOStatement() *Error {
 			resetHeadTo(pos)
 			return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
 		}
-		currentFunction.Append(instruction.Iload, currentSymbolTable.GetAddressOf(identifier))
+		currentFunction.Append(instruction.Loada, 0, currentSymbolTable.GetAddressOf(identifier))
 		currentFunction.Append(instruction.Iscan)
 		currentFunction.Append(instruction.Istore)
 	} else if next.Kind == token.Print {
@@ -385,6 +384,7 @@ func analyzeReturnStatement() *Error {
 		return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
 	}
 	// TODO: generate instructions
+	currentFunction.Append(instruction.Ret)
 	return nil
 }
 
@@ -474,12 +474,14 @@ func analyzeInitDeclarator(isConstant bool, declaredType int) *Error {
 		return nil
 	}
 	if next.Kind != token.AssignmentSign {
+		currentFunction.Append(instruction.Snew, 1)
 		resetHeadTo(pos)
 		return nil
 	}
 
 	address := currentSymbolTable.GetAddressOf(identifier)
-	currentFunction.Append(instruction.Ipush, address)
+	currentFunction.Append(instruction.Ipush, 0)
+	currentFunction.Append(instruction.Loada, 0, address)
 	if err := analyzeExpression(); err != nil {
 		return err
 	}
@@ -615,7 +617,10 @@ func analyzePrimaryExpression() *Error {
 				return err
 			}
 		} else {
-			currentFunction.Append(instruction.Ipush, sb.Address)
+			if sb.Kind == token.Double {
+				currentFunction.Append(instruction.Ipush, 0)
+			}
+			currentFunction.Append(instruction.Loada, 0, sb.Address)
 			currentFunction.Append(instruction.Iload)
 		}
 	} else if next.Kind == token.IntegerLiteral {
