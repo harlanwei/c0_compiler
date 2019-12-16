@@ -45,6 +45,7 @@ func analyzeIOStatement() *Error {
 			resetHeadTo(pos)
 			return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
 		}
+		currentFunction.Append(instruction.Printl)
 	} else {
 		resetHeadTo(pos)
 		return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)

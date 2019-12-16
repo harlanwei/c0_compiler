@@ -144,6 +144,7 @@ func analyzePrimaryExpression() *Error {
 	//    | <integer-literal>
 	//    | <function-call>
 
+	pos := getCurrentPos()
 	next, err := getNextToken()
 	if err != nil {
 		return cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
@@ -168,6 +169,7 @@ func analyzePrimaryExpression() *Error {
 			return cc0_error.Of(cc0_error.UndefinedIdentifier).On(currentLine, currentColumn)
 		}
 		if sb.IsCallable {
+			resetHeadTo(pos) // `analyzeFunctionCall` needs the identifier, thus the reset
 			if err := analyzeFunctionCall(); err != nil {
 				return err
 			}
@@ -201,7 +203,7 @@ func analyzeAssignmentExpression() *Error {
 		resetHeadTo(pos)
 		return cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
 	}
-	currentFunction.Append(instruction.Ipush, address)
+	currentFunction.Append(instruction.Loada, 0, address)
 	if err := analyzeExpression(); err != nil {
 		resetHeadTo(pos)
 		return err

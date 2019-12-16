@@ -28,10 +28,20 @@ func analyzeVariableDeclarations() *Error {
 	for {
 		pos := getCurrentPos()
 		next, err := getNextToken()
-		resetHeadTo(pos)
 		if err != nil || (next.Kind != token.Int && next.Kind != token.Const) {
+			resetHeadTo(pos)
 			return nil
 		}
+		if next, err := getNextToken(); err != nil || next.Kind != token.Identifier {
+			resetHeadTo(pos)
+			return nil
+		}
+		if next, err := getNextToken(); err != nil || (next.Kind != token.AssignmentSign &&
+			next.Kind != token.Comma && next.Kind != token.Semicolon) {
+			resetHeadTo(pos)
+			return nil
+		}
+		resetHeadTo(pos)
 		if err := analyzeVariableDeclaration(); err != nil {
 			return err
 		}

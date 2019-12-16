@@ -60,15 +60,15 @@ func analyzeReturnStatement() *Error {
 		return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
 	}
 
-	currentFunction.Append(instruction.Loada, 0, 0)
-	_ = analyzeExpression()
-	reservedStackSize := 0
+	if currentFunction.ReturnType != token.Void {
+		currentFunction.Append(instruction.Loada, 0, 0)
+		_ = analyzeExpression()
+	}
+
 	switch currentFunction.ReturnType {
 	case token.Double:
-		reservedStackSize = 2
 		currentFunction.Append(instruction.Dstore)
 	case token.Int:
-		reservedStackSize = 1
 		currentFunction.Append(instruction.Istore)
 	}
 
@@ -77,7 +77,13 @@ func analyzeReturnStatement() *Error {
 		return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
 	}
 
-	currentFunction.PopStack(reservedStackSize)
-	currentFunction.Append(instruction.Ret)
+	switch currentFunction.ReturnType {
+	case token.Double:
+		currentFunction.Append(instruction.Dret)
+	case token.Int:
+		currentFunction.Append(instruction.Iret)
+	case token.Void:
+		currentFunction.Append(instruction.Ret)
+	}
 	return nil
 }

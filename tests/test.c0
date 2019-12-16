@@ -2,11 +2,11 @@
  * A test function.
  */
 int fn() {
-    int i;
+    int i = 0;
     int limit = 10;
     scan(i);
     while (i < limit) {
-        print(i);
+        print(i, i * 2);
         i = i + 1;
     }
     return i;
