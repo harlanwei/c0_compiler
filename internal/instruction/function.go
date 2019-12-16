@@ -16,15 +16,17 @@ type FnInstructions struct {
 
 type Fn struct {
 	instructions     *FnInstructions
+	ReturnType       int
 	Parameters       *[]string
 	emptyMemorySlots *PriorityQueue
 	stackSize        int
 }
 
-func InitFn() (res *Fn) {
+func InitFn(returnType int) (res *Fn) {
 	res = &Fn{
 		instructions:     &FnInstructions{lines: &[]Line{}, offset: 0},
 		Parameters:       &[]string{},
+		ReturnType:       returnType,
 		emptyMemorySlots: &PriorityQueue{0},
 	}
 	heap.Init(res.emptyMemorySlots)

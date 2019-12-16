@@ -113,7 +113,7 @@ func (st *SymbolTable) AddAFunction(name string, returnType int) *Error {
 	}
 	st.Symbols[name] = Symbol{
 		Address:    st.nextFnCount(),
-		FnInfo:     InitFn(),
+		FnInfo:     InitFn(returnType),
 		IsCallable: true,
 		IsConstant: true,
 		Kind:       returnType,

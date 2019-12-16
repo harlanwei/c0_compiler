@@ -1,7 +1,7 @@
 /**
  * A test function.
  */
-void fn() {
+int fn() {
     int i;
     int limit = 10;
     scan(i);
@@ -9,11 +9,11 @@ void fn() {
         print(i);
         i = i + 1;
     }
-    print(6661);
-    return;
+    return i;
 }
 
 void main() {
-    fn();
+    int result = fn();
+    print(result);
     return;
 }

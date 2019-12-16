@@ -4,7 +4,6 @@ import (
 	"c0_compiler/internal/cc0_error"
 	"c0_compiler/internal/parser"
 	"c0_compiler/internal/token"
-	"fmt"
 )
 
 type Parser = parser.Parser
@@ -32,11 +31,4 @@ func getCurrentPos() int {
 func resetHeadTo(pos int) {
 	thatToken := globalParser.ResetHeadTo(pos)
 	currentColumn, currentLine = thatToken.Column, thatToken.Line
-}
-
-// Print all the tokens the parser generated directly to stdout.
-func BindToStdOut(parser *Parser) {
-	for parser.HasNextToken() {
-		fmt.Println(parser.NextToken())
-	}
 }

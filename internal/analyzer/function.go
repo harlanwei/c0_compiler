@@ -24,9 +24,6 @@ func analyzeFunctionDefinitions() *Error {
 func analyzeFunctionDefinition() *Error {
 	// <function-definition> ::= <type-specifier><identifier><parameter-clause><compound-statement>
 
-	currentFunction = instruction.InitFn()
-	currentSymbolTable = currentSymbolTable.AppendChildSymbolTable(currentFunction)
-
 	pos := getCurrentPos()
 	next, err := getNextToken()
 	if err != nil || !next.IsATypeSpecifier() {
@@ -34,6 +31,9 @@ func analyzeFunctionDefinition() *Error {
 		return cc0_error.Of(cc0_error.InvalidDeclaration).On(currentLine, currentColumn)
 	}
 	kind := next.Kind
+	currentFunction = instruction.InitFn(kind)
+	currentSymbolTable = currentSymbolTable.AppendChildSymbolTable(currentFunction)
+
 	next, err = getNextToken()
 	if err != nil || next.Kind != token.Identifier {
 		resetHeadTo(pos)
