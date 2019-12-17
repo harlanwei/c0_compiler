@@ -81,14 +81,19 @@ func analyzePrintableList() *Error {
 func analyzePrintable() *Error {
 	// <printable> ::= <expression> | <string-literal> | <char-literal>
 	pos := getCurrentPos()
-	if err := analyzeExpression(); err != nil {
+	kind, err := analyzeExpression()
+	if err != nil {
 		resetHeadTo(pos)
 	} else {
-		currentFunction.Append(instruction.Iprint)
+		if kind == token.Int {
+			currentFunction.Append(instruction.Iprint)
+		} else {
+			currentFunction.Append(instruction.Dprint)
+		}
 		return nil
 	}
-	next, err := getNextToken()
-	if err != nil {
+	next, anotherErr := getNextToken()
+	if anotherErr != nil {
 		return cc0_error.Of(cc0_error.IncompleteExpression)
 	}
 	if next.Kind == token.StringLiteral {

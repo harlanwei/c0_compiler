@@ -43,6 +43,12 @@ func (f *Fn) GetCurrentOffset() int {
 	return len(*f.instructions.lines)
 }
 
+func (f *Fn) InsertInstructionAt(offset int, instruction int, operands ...int) {
+	backup := *f.instructions.lines
+	*f.instructions.lines = append(backup[0:offset], f.generateLine(instruction, operands...))
+	*f.instructions.lines = append(*f.instructions.lines, backup[offset:]...)
+}
+
 func (f *Fn) GetCurrentConstantOffset() int {
 	return f.currentConstantOffset
 }
@@ -63,7 +69,7 @@ func (f *Fn) GetCurrentLine() *Line {
 	return &(lines[len(lines)-1])
 }
 
-func (f *Fn) Append(instruction int, operands ...int) {
+func (f *Fn) generateLine(instruction int, operands ...int) Line {
 	i := GetInstruction(instruction)
 	f.stackSize += i.changesToStackSize
 	if !i.IsValidInstruction(operands...) {
@@ -71,7 +77,11 @@ func (f *Fn) Append(instruction int, operands ...int) {
 		cc0_error.ThrowAndExit(cc0_error.Analyzer)
 	}
 	f.instructions.offset += i.offset
-	*f.instructions.lines = append(*f.instructions.lines, Line{I: i, Operands: &operands})
+	return Line{I: i, Operands: &operands}
+}
+
+func (f *Fn) Append(instruction int, operands ...int) {
+	*f.instructions.lines = append(*f.instructions.lines, f.generateLine(instruction, operands...))
 }
 
 func (f *Fn) NextMemorySlot() (slot int) {

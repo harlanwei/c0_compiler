@@ -6,6 +6,8 @@ import (
 	"c0_compiler/internal/token"
 )
 
+var currentInitializationKind int
+
 func analyzeDeclaratorList(isConstant bool, declaredType int) *Error {
 	// <init-declarator-list> ::= <init-declarator>{','<init-declarator>}
 	if err := analyzeInitDeclarator(isConstant, declaredType); err != nil {
@@ -79,6 +81,7 @@ func analyzeVariableDeclaration() *Error {
 		return cc0_error.Of(cc0_error.IncompleteVariableDeclaration).On(currentLine, currentColumn)
 	}
 	kind := tokenKindToType(next)
+	currentInitializationKind = next.Kind
 
 	// <init-declarator-list>
 	if err := analyzeDeclaratorList(isAConstant, kind); err != nil {
@@ -134,9 +137,22 @@ func analyzeInitDeclarator(isConstant bool, declaredType int) *Error {
 	address := currentSymbolTable.GetAddressOf(identifier)
 	currentFunction.Append(instruction.Ipush, 0)
 	currentFunction.Append(instruction.Loada, currentSymbolTable.GetLevelDiff(identifier), address)
-	if err := analyzeExpression(); err != nil {
-		return err
+	kind, anotherErr := analyzeExpression()
+	if anotherErr != nil {
+		return anotherErr
 	}
-	currentFunction.Append(instruction.Istore)
+
+	if kind != currentInitializationKind {
+		convertType(kind, currentInitializationKind)
+	}
+
+	switch currentInitializationKind {
+	case token.Void:
+		cc0_error.ThrowAndExit(cc0_error.Parser)
+	case token.Double:
+		currentFunction.Append(instruction.Dstore)
+	case token.Int, token.Char:
+		currentFunction.Append(instruction.Istore)
+	}
 	return nil
 }

@@ -61,7 +61,13 @@ func analyzeReturnStatement() *Error {
 	}
 
 	if currentFunction.ReturnType != token.Void {
-		_ = analyzeExpression()
+		kind, err := analyzeExpression()
+		if err != nil {
+			return err
+		}
+		if kind != currentFunction.ReturnType {
+			convertType(kind, currentFunction.ReturnType)
+		}
 	}
 
 	if next, err := getNextToken(); err != nil || next.Kind != token.Semicolon {

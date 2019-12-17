@@ -6,26 +6,69 @@ import (
 	"c0_compiler/internal/token"
 )
 
+func getConvertInstruction(source, dest int) int {
+	if source == token.Void || dest == token.Void {
+		cc0_error.ThrowAndExit(cc0_error.Analyzer)
+	}
+	if (source == token.Int || source == token.Char) && dest == token.Double {
+		return instruction.I2d
+	} else if source == token.Double && (source == token.Int || source == token.Char) {
+		return instruction.D2i
+	}
+	panic("An unexpected type convert took place here.")
+	return 0
+}
+
+func convertType(source, dest int) {
+	currentFunction.Append(getConvertInstruction(source, dest))
+}
+
+func convergeToLargerType(lhs, rhs int) int {
+	if lhs > rhs {
+		return lhs
+	}
+	return rhs
+}
+
 func analyzeCondition() *Error {
 	// <condition> ::= <expression>[<relational-operator><expression>]
 
 	pos := getCurrentPos()
-	if err := analyzeExpression(); err != nil {
+	kind, err := analyzeExpression()
+	if err != nil {
 		resetHeadTo(pos)
 		return err
 	}
+	previousOffset := currentFunction.GetCurrentOffset()
 	pos = getCurrentPos()
-	next, err := getNextToken()
-	if err != nil || !next.IsARelationalOperator() {
+	next, anotherErr := getNextToken()
+	if anotherErr != nil || !next.IsARelationalOperator() {
 		resetHeadTo(pos)
 		return nil
 	}
 	operator := next.Kind
-	if err := analyzeExpression(); err != nil {
+	anotherKind, err := analyzeExpression()
+	if err != nil {
 		resetHeadTo(pos)
 		return err
 	}
-	currentFunction.Append(instruction.Icmp)
+
+	if kind != anotherKind {
+		convergedKind := convergeToLargerType(kind, anotherKind)
+		if kind != convergedKind {
+			currentFunction.InsertInstructionAt(previousOffset, getConvertInstruction(kind, convergedKind))
+		} else {
+			convertType(anotherKind, convergedKind)
+		}
+		kind = convergedKind
+	}
+
+	if kind == token.Int {
+		currentFunction.Append(instruction.Icmp)
+	} else {
+		currentFunction.Append(instruction.Dcmp)
+	}
+
 	// Only jump when the condition doesn't stand
 	switch operator {
 	case token.LessThan:
@@ -44,18 +87,20 @@ func analyzeCondition() *Error {
 	return nil
 }
 
-func analyzeExpression() *Error {
+func analyzeExpression() (int, *Error) {
 	// <expression> ::= <additive-expression>
 	return analyzeAdditiveExpression()
 }
 
-func analyzeAdditiveExpression() *Error {
+func analyzeAdditiveExpression() (int, *Error) {
 	// <additive-expression> ::= <multiplicative-expression>{<additive-operator><multiplicative-expression>}
 
 	// <multiplicative-expression>
-	if err := analyzeMultiplicativeExpression(); err != nil {
-		return err
+	kind, err := analyzeMultiplicativeExpression()
+	if err != nil {
+		return 0, err
 	}
+	previousOffset := currentFunction.GetCurrentOffset()
 
 	// {<additive-operator><multiplicative-expression>}
 	for {
@@ -63,28 +108,88 @@ func analyzeAdditiveExpression() *Error {
 		next, err := getNextToken()
 		if err != nil || !next.IsAnAdditiveOperator() {
 			resetHeadTo(pos)
-			return nil
+			return 0, nil
 		}
 		operator := next.Kind
-		if err := analyzeMultiplicativeExpression(); err != nil {
+		anotherKind, anotherErr := analyzeMultiplicativeExpression()
+		if anotherErr != nil {
 			resetHeadTo(pos)
-			return err
+			return 0, anotherErr
+		}
+
+		kind := convergeToLargerType(kind, anotherKind)
+		if kind != anotherKind {
+			convergedKind := convergeToLargerType(kind, anotherKind)
+			if kind != convergedKind {
+				currentFunction.InsertInstructionAt(previousOffset, getConvertInstruction(kind, convergedKind))
+			} else {
+				convertType(anotherKind, convergedKind)
+			}
+			kind = convergedKind
 		}
 
 		if operator == token.PlusSign {
-			currentFunction.Append(instruction.Iadd)
+			if kind == token.Double {
+				currentFunction.Append(instruction.Dadd)
+			} else {
+				currentFunction.Append(instruction.Iadd)
+			}
 		} else {
-			currentFunction.Append(instruction.Isub)
+			if kind == token.Double {
+				currentFunction.Append(instruction.Dsub)
+			} else {
+				currentFunction.Append(instruction.Isub)
+			}
 		}
 	}
 }
 
-func analyzeMultiplicativeExpression() *Error {
-	// <multiplicative-expression> ::= <unary-expression>{<multiplicative-operator><unary-expression>}
+func analyzeCastExpression() (int, *Error) {
+	// <cast-expression> ::= {'('<type-specifier>')'}<unary-expression>
+	pos := getCurrentPos()
+	kind := 0
+	next, err := getNextToken()
+	if err != nil {
+		resetHeadTo(pos)
+		return 0, cc0_error.Of(cc0_error.IncompleteExpression)
+	}
+	if next.Kind == token.LeftParenthesis {
+		next, err := getNextToken()
+		if err != nil {
+			return 0, cc0_error.Of(cc0_error.IncompleteExpression)
+		}
+		kind = next.Kind
+		for {
+			anotherPos := getCurrentPos()
+			next, err = getNextToken()
+			if err != nil {
+				resetHeadTo(anotherPos)
+				return 0, cc0_error.Of(cc0_error.IncompleteExpression)
+			}
+			if !next.IsATypeSpecifier() {
+				resetHeadTo(anotherPos)
+				break
+			}
+		}
+	} else {
+		resetHeadTo(pos)
+	}
+	unaryKind, anotherErr := analyzeUnaryExpression()
+	if anotherErr != nil {
+		resetHeadTo(pos)
+		return 0, anotherErr
+	}
+	convertType(unaryKind, kind)
+	return kind, nil
+}
 
-	// <unary-expression>
-	if err := analyzeUnaryExpression(); err != nil {
-		return err
+func analyzeMultiplicativeExpression() (int, *Error) {
+	// <multiplicative-expression> ::= <cast-expression>{<multiplicative-operator><cast-expression>}
+
+	// <cast-expression>
+	kind, err := analyzeCastExpression()
+	if err != nil {
+		return 0, err
 	}
 
 	// {<multiplicative-operator><unary-expression>}
@@ -93,21 +198,31 @@ func analyzeMultiplicativeExpression() *Error {
 		next, err := getNextToken()
 		if err != nil || !next.IsAMultiplicativeOperator() {
 			resetHeadTo(pos)
-			return nil
+			return 0, nil
 		}
-		if err := analyzeUnaryExpression(); err != nil {
+		anotherKind, anotherErr := analyzeUnaryExpression()
+		if err != nil {
 			resetHeadTo(pos)
-			return err
+			return 0, anotherErr
 		}
+		kind = convergeToLargerType(kind, anotherKind)
 		if next.Kind == token.MultiplicationSign {
-			currentFunction.Append(instruction.Imul)
+			if kind == token.Double {
+				currentFunction.Append(instruction.Dmul)
+			} else {
+				currentFunction.Append(instruction.Imul)
+			}
 		} else {
-			currentFunction.Append(instruction.Idiv)
+			if kind == token.Double {
+				currentFunction.Append(instruction.Ddiv)
+			} else {
+				currentFunction.Append(instruction.Idiv)
+			}
 		}
 	}
 }
 
-func analyzeUnaryExpression() *Error {
+func analyzeUnaryExpression() (int, *Error) {
 	// <unary-expression> ::= [<unary-operator>]<primary-expression>
 
 	// [<unary-operator>]
@@ -115,7 +230,7 @@ func analyzeUnaryExpression() *Error {
 	pos := getCurrentPos()
 	next, err := getNextToken()
 	if err != nil {
-		return cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
+		return 0, cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
 	}
 	if next.IsAnUnaryOperator() {
 		if next.Kind == token.MinusSign {
@@ -126,18 +241,19 @@ func analyzeUnaryExpression() *Error {
 	}
 
 	// <primary-expression>
-	if err := analyzePrimaryExpression(); err != nil {
+	kind, anotherErr := analyzePrimaryExpression()
+	if anotherErr != nil {
 		resetHeadTo(pos)
-		return err
+		return 0, anotherErr
 	}
 
 	if shouldBeNegated {
 		currentFunction.Append(instruction.Ineg)
 	}
-	return nil
+	return kind, nil
 }
 
-func analyzePrimaryExpression() *Error {
+func analyzePrimaryExpression() (int, *Error) {
 	// <primary-expression> ::=
 	//     '('<expression>')'
 	//    | <identifier>
@@ -146,32 +262,36 @@ func analyzePrimaryExpression() *Error {
 
 	pos := getCurrentPos()
 	next, err := getNextToken()
+	kind := 0
 	if err != nil {
-		return cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
+		return 0, cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
 	}
 
 	// '('<expression>')'
 	if next.Kind == token.LeftParenthesis {
-		if err := analyzeExpression(); err != nil {
-			return err
+		var anotherErr *Error
+		kind, anotherErr = analyzeExpression()
+		if anotherErr != nil {
+			return 0, anotherErr
 		}
 		next, err = getNextToken()
 		if err != nil {
-			return cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
+			return 0, cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
 		}
 		if next.Kind != token.RightParenthesis {
-			return cc0_error.Of(cc0_error.IllegalExpression).On(currentLine, currentColumn)
+			return 0, cc0_error.Of(cc0_error.IllegalExpression).On(currentLine, currentColumn)
 		}
 	} else if next.Kind == token.Identifier { // <identifier> || <function-call>
 		identifier := next.Value.(string)
 		sb := currentSymbolTable.GetSymbolNamed(identifier)
 		if sb == nil {
-			return cc0_error.Of(cc0_error.UndefinedIdentifier).On(currentLine, currentColumn)
+			return 0, cc0_error.Of(cc0_error.UndefinedIdentifier).On(currentLine, currentColumn)
 		}
+		kind = sb.Kind
 		if sb.IsCallable {
 			resetHeadTo(pos) // `analyzeFunctionCall` needs the identifier, thus the reset
 			if err := analyzeFunctionCall(); err != nil {
-				return err
+				return 0, err
 			}
 		} else {
 			currentFunction.Append(instruction.Loada, currentSymbolTable.GetLevelDiff(identifier), sb.Address)
@@ -184,10 +304,11 @@ func analyzePrimaryExpression() *Error {
 	} else if next.Kind == token.IntegerLiteral {
 		// <integer-literal>
 		currentFunction.Append(instruction.Ipush, int(next.Value.(int64)))
+		kind = token.Int
 	} else {
-		return cc0_error.Of(cc0_error.IllegalExpression).On(currentLine, currentColumn)
+		return 0, cc0_error.Of(cc0_error.IllegalExpression).On(currentLine, currentColumn)
 	}
-	return nil
+	return kind, nil
 }
 
 func analyzeAssignmentExpression() *Error {
@@ -210,9 +331,11 @@ func analyzeAssignmentExpression() *Error {
 		return cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
 	}
 	currentFunction.Append(instruction.Loada, currentSymbolTable.GetLevelDiff(identifier), address)
-	if err := analyzeExpression(); err != nil {
+	kind, anotherErr := analyzeExpression()
+	convertType(kind, currentSymbolTable.GetSymbolNamed(identifier).Kind)
+	if anotherErr != nil {
 		resetHeadTo(pos)
-		return err
+		return anotherErr
 	}
 	currentFunction.Append(instruction.Istore)
 	return nil
@@ -221,7 +344,7 @@ func analyzeAssignmentExpression() *Error {
 func analyzeExpressionList() *Error {
 	// <expression-list> ::= <expression>{','<expression>}
 	pos := getCurrentPos()
-	if err := analyzeExpression(); err != nil {
+	if _, err := analyzeExpression(); err != nil {
 		resetHeadTo(pos)
 		return err
 	}
@@ -231,7 +354,7 @@ func analyzeExpressionList() *Error {
 			resetHeadTo(pos)
 			return nil
 		}
-		if err := analyzeExpression(); err != nil {
+		if _, err := analyzeExpression(); err != nil {
 			return err
 		}
 	}

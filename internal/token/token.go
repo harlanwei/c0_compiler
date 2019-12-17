@@ -23,11 +23,11 @@ const (
 	DoubleLiteral
 	Const
 	Void
-	Int
 	Char // the type
+	Int
+	Double
 	CharLiteral
 	StringLiteral
-	Double
 	Struct
 	If
 	Else
