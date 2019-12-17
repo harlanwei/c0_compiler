@@ -35,22 +35,21 @@ func main() {
 	shouldShowUsage := flag.Bool("h", false, "显示关于编译器使用的帮助")
 	shouldOutputText := flag.Bool("s", false, "将输入的 c0 源代码翻译为文本汇编文件")
 	shouldOutputBinary := flag.Bool("c", false, "将输入的 c0 源代码翻译为二进制目标文件")
-	isDebugging := flag.Bool("debug", false, "Run the program in debugging mode")
 	destination := flag.String("o", "out", "输出到指定的文件 file")
-	flag.Parse()
-
-	// cc0 [-h]
-	if *shouldShowUsage {
-		displayUsage(false)
-	}
 
 	// cc0 [options] input [-o file]
+	flag.Parse()
 	remainingArgs := flag.Args()
 	var source string
 	if len(remainingArgs) != 1 {
 		displayUsage(true)
 	} else {
 		source = remainingArgs[0]
+	}
+
+	// cc0 [-h]
+	if *shouldShowUsage {
+		displayUsage(false)
 	}
 
 	reader, err := os.Open(source)
@@ -69,13 +68,9 @@ func main() {
 	lines := assembler.Run(globalSymbolTable)
 
 	var outfile *os.File
-	if *isDebugging {
-		outfile = os.Stdout
-	} else {
-		outfile, err = os.Create(*destination)
-		if err != nil {
-			panic(err)
-		}
+	outfile, err = os.Create(*destination)
+	if err != nil {
+		panic(err)
 	}
 	defer func() {
 		if err := outfile.Close(); err != nil {
