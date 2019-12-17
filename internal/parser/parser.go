@@ -376,7 +376,7 @@ func divideTokens(lineCount int, line string, buffer *[]Token) {
 			}
 			*buffer = append(*buffer, Token{
 				Kind:   token.StringLiteral,
-				Value:  parsed,
+				Value:  string(parsed),
 				Line:   lineCount,
 				Column: columnCount,
 			})

@@ -79,10 +79,28 @@ func analyzePrintableList() *Error {
 }
 
 func analyzePrintable() *Error {
-	// <printable> ::= <expression>
+	// <printable> ::= <expression> | <string-literal> | <char-literal>
+	pos := getCurrentPos()
 	if err := analyzeExpression(); err != nil {
-		return err
+		resetHeadTo(pos)
+	} else {
+		currentFunction.Append(instruction.Iprint)
+		return nil
 	}
-	currentFunction.Append(instruction.Iprint)
+	next, err := getNextToken()
+	if err != nil {
+		return cc0_error.Of(cc0_error.IncompleteExpression)
+	}
+	if next.Kind == token.StringLiteral {
+		address := globalSymbolTable.AddALiteral(instruction.ConstantKindString, next.Value.(string))
+		currentFunction.Append(instruction.Loadc, -address)
+		currentFunction.Append(instruction.Sprint)
+		return nil
+	} else if next.Kind == token.CharLiteral {
+		currentFunction.Append(instruction.Bipush, int(next.Value.(int32)))
+		currentFunction.Append(instruction.Cprint)
+	} else {
+		return cc0_error.Of(cc0_error.IncompleteExpression)
+	}
 	return nil
 }

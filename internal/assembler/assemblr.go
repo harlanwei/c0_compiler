@@ -9,6 +9,7 @@ import (
 
 var sortedFunctions = &[]instruction.Symbol{}
 var lines = &[]string{}
+var addressOffset int // for constants
 
 func appendLine(format string, params ...interface{}) {
 	*lines = append(*lines, fmt.Sprintf(format, params...))
@@ -19,6 +20,9 @@ func appendEmptyLine() {
 }
 
 func printLine(line instruction.Line) {
+	if line.I.Code == instruction.Loadc && (*line.Operands)[0] <= 0 {
+		(*line.Operands)[0] = addressOffset - (*line.Operands)[0]
+	}
 	str := line.I.Representation
 	for _, operand := range *line.Operands {
 		str += fmt.Sprintf(" %d", operand)
@@ -31,14 +35,16 @@ func assembleConstants(st *instruction.SymbolTable) {
 	for index, sb := range *sortedFunctions {
 		appendLine("%d S \"%s\"\n", index, sb.Name)
 	}
-	// addressOffset := len(*sortedFunctions)
+	addressOffset = len(*sortedFunctions)
 	for _, c := range *st.Constants {
-		// address := c.Address + addressOffset
+		address := addressOffset - c.Address
 		switch c.Kind {
 		case instruction.ConstantKindInt:
+			// not used
 		case instruction.ConstantKindDouble:
+			// TODO
 		case instruction.ConstantKindString:
-			// Don't think I need them at this point so I'm just not gonna implement them.
+			appendLine("%d S \"%s\"\n", address, c.Value)
 		}
 	}
 	appendEmptyLine()

@@ -128,3 +128,14 @@ func (st *SymbolTable) GetLevelDiff(name string) int {
 	}
 	return 1
 }
+
+// This is almost always only received by the global symbol table.
+func (st *SymbolTable) AddALiteral(kind int, value interface{}) (address int) {
+	address = st.RelatedFunction.GetAnEmptyConstantSlot()
+	*st.Constants = append(*st.Constants, Constant{
+		Kind:    kind,
+		Value:   value,
+		Address: address,
+	})
+	return
+}

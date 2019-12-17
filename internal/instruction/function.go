@@ -15,19 +15,21 @@ type FnInstructions struct {
 }
 
 type Fn struct {
-	instructions     *FnInstructions
-	ReturnType       int
-	Parameters       *[]string
-	emptyMemorySlots *PriorityQueue
-	stackSize        int
+	instructions          *FnInstructions
+	ReturnType            int
+	Parameters            *[]string
+	emptyMemorySlots      *PriorityQueue
+	currentConstantOffset int
+	stackSize             int
 }
 
 func InitFn(returnType int) (res *Fn) {
 	res = &Fn{
-		instructions:     &FnInstructions{lines: &[]Line{}, offset: 0},
-		Parameters:       &[]string{},
-		ReturnType:       returnType,
-		emptyMemorySlots: &PriorityQueue{0},
+		instructions:          &FnInstructions{lines: &[]Line{}, offset: 0},
+		Parameters:            &[]string{},
+		ReturnType:            returnType,
+		currentConstantOffset: 0,
+		emptyMemorySlots:      &PriorityQueue{0},
 	}
 	heap.Init(res.emptyMemorySlots)
 	return
@@ -39,6 +41,16 @@ func (f *Fn) GetLines() *[]Line {
 
 func (f *Fn) GetCurrentOffset() int {
 	return len(*f.instructions.lines)
+}
+
+func (f *Fn) GetCurrentConstantOffset() int {
+	return f.currentConstantOffset
+}
+
+func (f *Fn) GetAnEmptyConstantSlot() (result int) {
+	result = f.currentConstantOffset
+	f.currentConstantOffset++
+	return
 }
 
 func (f *Fn) GetPreviousLine() *Line {
