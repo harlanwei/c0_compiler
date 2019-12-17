@@ -20,5 +20,9 @@ int fn(int i) {
 void main() {
     int result = fn(GLOBALCONST);
     print(result);
+
+    const int anotherResult = 1 + 2 * 3;
+    print(anotherResult);
+    
     return;
 }

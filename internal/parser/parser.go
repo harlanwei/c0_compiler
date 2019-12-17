@@ -10,6 +10,8 @@ import (
 )
 
 var isInACommentBlock = false
+var isParsingACharLiteral = false
+var isParsingAStringLiteral = false
 
 type Token = token.Token
 
@@ -83,7 +85,7 @@ func hexIntegerParser(word string) (int64, *parserError) {
 	return parseIntegerValue(hexMatcher, 16, word[2:])
 }
 
-func parseIntegerLiteral(currentToken *Token) {
+func parseNumberLiteral(currentToken *Token) {
 	var integerParser func(string) (int64, *parserError)
 	word := currentToken.Value.(string)
 
@@ -203,8 +205,11 @@ func parseAllTheTokensIn(buffer []Token) {
 	for ind, _ := range buffer {
 		currentToken := &buffer[ind]
 
+		if currentToken.Kind == token.StringLiteral || currentToken.Kind == token.CharLiteral {
+			continue
+		}
 		if word := currentToken.Value.(string); unicode.IsNumber(rune(word[0])) {
-			parseIntegerLiteral(currentToken)
+			parseNumberLiteral(currentToken)
 		} else if unicode.IsLetter(rune(word[0])) {
 			parseKeywords(currentToken)
 		} else {
@@ -214,7 +219,7 @@ func parseAllTheTokensIn(buffer []Token) {
 }
 
 func isDigitOrLetter(character rune) bool {
-	return unicode.IsNumber(character) || unicode.IsLetter(character)
+	return unicode.IsNumber(character) || unicode.IsLetter(character) || character == '.'
 }
 
 func isAnOperatorWithTwoCharacters(operator string) bool {
@@ -223,6 +228,84 @@ func isAnOperatorWithTwoCharacters(operator string) bool {
 		return true
 	}
 	return false
+}
+
+func isCharLiteral(r rune) bool {
+	switch r {
+	case '\'', '\\', 0x0a, 0x0d:
+		return false
+	}
+	return true
+}
+
+func parseCharSequence(line string, start int) (result rune, end int) {
+	lineLength := len(line)
+	if line[start] == '\\' {
+		// escaped char
+		if start+1 >= lineLength {
+			return -1, 0
+		}
+		if line[start+1] == 'x' {
+			// represented by hex
+			if start+3 >= lineLength {
+				return -1, 0
+			}
+			resultAsInt64, _ := strconv.ParseInt(line[start+2:start+4], 16, 32)
+			result = rune(resultAsInt64)
+			end = start + 4
+		} else {
+			result = rune(line[start+1])
+			end = start + 2
+		}
+	} else {
+		result = rune(line[start])
+		end = start + 1
+	}
+	return
+}
+
+// `line[start]` should be a single quote.
+func parseCharLiteral(line string, start int) (result rune, end int) {
+	lineLength := len(line)
+	if start+1 >= lineLength {
+		return -1, 0
+	}
+	result, end = parseCharSequence(line, start+1)
+	if end >= len(line) || line[end] != '\'' {
+		return -1, 0
+	}
+	end++
+	return
+}
+
+// `line[start]` should be a double quote.
+func parseStringLiteral(line string, start int) ([]rune, int, bool) {
+	end, lineLength := start+1, len(line)
+	res := []rune{}
+	for end < lineLength {
+		b, nextEnd := parseCharSequence(line, end)
+		if b < 0 {
+			return res, -1, false
+		}
+		if nextEnd-end == 1 && b == '"' {
+			return res, nextEnd, true
+		}
+		res = append(res, b)
+		end = nextEnd
+	}
+	return res, -1, false
+}
+
+func reportIllegalCharLiteral(lineCount, columnCount int) {
+	cc0_error.ReportLineAndColumn(lineCount, columnCount)
+	cc0_error.PrintlnToStdErr("Illegal character literal.")
+	cc0_error.ThrowAndExit(cc0_error.Parser)
+}
+
+func reportIllegalStringLiteral(lineCount, columnCount int) {
+	cc0_error.ReportLineAndColumn(lineCount, columnCount)
+	cc0_error.PrintlnToStdErr("Illegal string literal.")
+	cc0_error.ThrowAndExit(cc0_error.Parser)
 }
 
 func divideTokens(lineCount int, line string, buffer *[]Token) {
@@ -268,7 +351,37 @@ func divideTokens(lineCount int, line string, buffer *[]Token) {
 			continue
 		}
 
-		if !isInACommentBlock {
+		if isInACommentBlock {
+			return
+		}
+		if currentTokenString == "'" {
+			if columnCount+2 >= len(line) {
+				reportIllegalCharLiteral(lineCount, columnCount)
+			}
+			parsed, end := parseCharLiteral(line, columnCount-1)
+			if parsed < 0 {
+				reportIllegalCharLiteral(lineCount, columnCount)
+			}
+			columnCount = end
+			*buffer = append(*buffer, Token{
+				Kind:   token.CharLiteral,
+				Value:  parsed,
+				Line:   lineCount,
+				Column: columnCount,
+			})
+		} else if currentTokenString == "\"" {
+			parsed, end, ok := parseStringLiteral(line, columnCount-1)
+			if !ok {
+				reportIllegalStringLiteral(lineCount, columnCount)
+			}
+			*buffer = append(*buffer, Token{
+				Kind:   token.StringLiteral,
+				Value:  parsed,
+				Line:   lineCount,
+				Column: columnCount,
+			})
+			columnCount = end
+		} else {
 			*buffer = append(*buffer, Token{
 				Kind:   token.NotParsed,
 				Value:  currentTokenString,

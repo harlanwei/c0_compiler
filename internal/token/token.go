@@ -20,10 +20,13 @@ const (
 	Comma
 	Semicolon
 	IntegerLiteral
+	DoubleLiteral
 	Const
 	Void
 	Int
-	Char
+	Char // the type
+	CharLiteral
+	StringLiteral
 	Double
 	Struct
 	If
