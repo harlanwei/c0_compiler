@@ -67,6 +67,7 @@ const (
 	IncompleteFunctionCall
 	UndefinedIdentifier
 	NoMain
+	AssignmentToConstant
 )
 
 type Error struct {
@@ -118,6 +119,8 @@ func (error *Error) Error() string {
 		return "Cannot use an undefined identifier."
 	case NoMain:
 		return "No main function is defined."
+	case AssignmentToConstant:
+		return "Cannot assign a new value to a constant."
 	default:
 		return "An unknown error occurred."
 	}

@@ -1,19 +1,24 @@
 /**
  * A test function.
  */
-int fn() {
-    int i = 0;
+const int GLOBALCONST = 3;
+
+int fn(int i) {
+    int value = 3;
     int limit = 10;
-    scan(i);
+
     while (i < limit) {
         print(i, i * 2);
         i = i + 1;
+        value = value + 4;
+        print(value);
     }
-    return i;
+
+    return value;
 }
 
 void main() {
-    int result = fn();
+    int result = fn(GLOBALCONST);
     print(result);
     return;
 }

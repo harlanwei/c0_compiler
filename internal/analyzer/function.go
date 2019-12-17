@@ -147,9 +147,9 @@ func analyzeParameterDeclaration() *Error {
 	identifier := next.Value.(string)
 
 	if isConst {
-		_ = currentSymbolTable.AddAVariable(identifier, kind)
-	} else {
 		_ = currentSymbolTable.AddAConstant(identifier, kind)
+	} else {
+		_ = currentSymbolTable.AddAVariable(identifier, kind)
 	}
 	*currentFunction.Parameters = append(*currentFunction.Parameters, identifier)
 	return nil

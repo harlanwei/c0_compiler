@@ -29,7 +29,7 @@ func analyzeIOStatement() *Error {
 			resetHeadTo(pos)
 			return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
 		}
-		currentFunction.Append(instruction.Loada, 0, currentSymbolTable.GetAddressOf(identifier))
+		currentFunction.Append(instruction.Loada, currentSymbolTable.GetLevelDiff(identifier), currentSymbolTable.GetAddressOf(identifier))
 		currentFunction.Append(instruction.Iscan)
 		currentFunction.Append(instruction.Istore)
 	} else if next.Kind == token.Print {

@@ -61,15 +61,7 @@ func analyzeReturnStatement() *Error {
 	}
 
 	if currentFunction.ReturnType != token.Void {
-		currentFunction.Append(instruction.Loada, 0, 0)
 		_ = analyzeExpression()
-	}
-
-	switch currentFunction.ReturnType {
-	case token.Double:
-		currentFunction.Append(instruction.Dstore)
-	case token.Int:
-		currentFunction.Append(instruction.Istore)
 	}
 
 	if next, err := getNextToken(); err != nil || next.Kind != token.Semicolon {

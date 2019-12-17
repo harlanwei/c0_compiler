@@ -121,3 +121,10 @@ func (st *SymbolTable) AddAFunction(name string, returnType int) *Error {
 	}
 	return nil
 }
+
+func (st *SymbolTable) GetLevelDiff(name string) int {
+	if _, ok := st.Symbols[name]; ok {
+		return 0
+	}
+	return 1
+}

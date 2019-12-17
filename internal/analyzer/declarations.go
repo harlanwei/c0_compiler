@@ -32,6 +32,12 @@ func analyzeVariableDeclarations() *Error {
 			resetHeadTo(pos)
 			return nil
 		}
+		if next.Kind == token.Const {
+			if next, err := getNextToken(); err != nil || next.Kind != token.Int {
+				resetHeadTo(pos)
+				return nil
+			}
+		}
 		if next, err := getNextToken(); err != nil || next.Kind != token.Identifier {
 			resetHeadTo(pos)
 			return nil
@@ -127,7 +133,7 @@ func analyzeInitDeclarator(isConstant bool, declaredType int) *Error {
 
 	address := currentSymbolTable.GetAddressOf(identifier)
 	currentFunction.Append(instruction.Ipush, 0)
-	currentFunction.Append(instruction.Loada, 0, address)
+	currentFunction.Append(instruction.Loada, currentSymbolTable.GetLevelDiff(identifier), address)
 	if err := analyzeExpression(); err != nil {
 		return err
 	}

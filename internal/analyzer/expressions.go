@@ -174,11 +174,12 @@ func analyzePrimaryExpression() *Error {
 				return err
 			}
 		} else {
+			currentFunction.Append(instruction.Loada, currentSymbolTable.GetLevelDiff(identifier), sb.Address)
 			if sb.Kind == token.Double {
-				currentFunction.Append(instruction.Ipush, 0)
+				currentFunction.Append(instruction.Dload)
+			} else {
+				currentFunction.Append(instruction.Iload)
 			}
-			currentFunction.Append(instruction.Loada, 0, sb.Address)
-			currentFunction.Append(instruction.Iload)
 		}
 	} else if next.Kind == token.IntegerLiteral {
 		// <integer-literal>
@@ -198,12 +199,17 @@ func analyzeAssignmentExpression() *Error {
 		return cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
 	}
 	identifier := next.Value.(string)
+	if currentSymbolTable.GetSymbolNamed(identifier).IsConstant {
+		cc0_error.ReportLineAndColumn(currentLine, currentColumn)
+		cc0_error.PrintfToStdErr("Cannot assign a new value to the constant: %s\n", identifier)
+		cc0_error.ThrowAndExit(cc0_error.Analyzer)
+	}
 	address := currentSymbolTable.GetAddressOf(identifier)
 	if next, err := getNextToken(); err != nil || next.Kind != token.AssignmentSign {
 		resetHeadTo(pos)
 		return cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
 	}
-	currentFunction.Append(instruction.Loada, 0, address)
+	currentFunction.Append(instruction.Loada, currentSymbolTable.GetLevelDiff(identifier), address)
 	if err := analyzeExpression(); err != nil {
 		resetHeadTo(pos)
 		return err
@@ -252,7 +258,7 @@ func analyzeFunctionCall() *Error {
 		resetHeadTo(pos)
 		return cc0_error.Of(cc0_error.IncompleteFunctionCall).On(currentLine, currentColumn)
 	}
-	// TODO: check parameters and push them on the stack
+	// TODO: check parameters
 	_ = analyzeExpressionList()
 	if next, err := getNextToken(); err != nil || next.Kind != token.RightParenthesis {
 		resetHeadTo(pos)

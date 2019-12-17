@@ -38,7 +38,7 @@ func assembleConstants(st *instruction.SymbolTable) {
 		case instruction.ConstantKindInt:
 		case instruction.ConstantKindDouble:
 		case instruction.ConstantKindString:
-			// TODO
+			// Don't think I need them at this point so I'm just not gonna implement them.
 		}
 	}
 	appendEmptyLine()
