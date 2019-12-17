@@ -1,2 +1,3 @@
-module vian.im/c0_compiler
+module c0_compiler
 
+go 1.13
