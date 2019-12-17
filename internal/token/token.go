@@ -57,7 +57,7 @@ type Token struct {
 func (t *Token) IsATypeSpecifier() bool {
 	k := t.Kind
 	switch k {
-	case Int, Char, Void:
+	case Int, Char, Double, Void:
 		return true
 	}
 	return false

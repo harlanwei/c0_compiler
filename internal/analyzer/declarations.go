@@ -6,11 +6,11 @@ import (
 	"c0_compiler/internal/token"
 )
 
-var currentInitializationKind int
+var currentInitializationType int
 
-func analyzeDeclaratorList(isConstant bool, declaredType int) *Error {
+func analyzeDeclaratorList(isConstant bool) *Error {
 	// <init-declarator-list> ::= <init-declarator>{','<init-declarator>}
-	if err := analyzeInitDeclarator(isConstant, declaredType); err != nil {
+	if err := analyzeInitDeclarator(isConstant); err != nil {
 		return err
 	}
 	for {
@@ -20,7 +20,7 @@ func analyzeDeclaratorList(isConstant bool, declaredType int) *Error {
 			resetHeadTo(pos)
 			return nil
 		}
-		if err := analyzeInitDeclarator(isConstant, declaredType); err != nil {
+		if err := analyzeInitDeclarator(isConstant); err != nil {
 			return err
 		}
 	}
@@ -30,12 +30,12 @@ func analyzeVariableDeclarations() *Error {
 	for {
 		pos := getCurrentPos()
 		next, err := getNextToken()
-		if err != nil || (next.Kind != token.Int && next.Kind != token.Const) {
+		if err != nil || (!next.IsATypeSpecifier() && next.Kind != token.Const) {
 			resetHeadTo(pos)
 			return nil
 		}
 		if next.Kind == token.Const {
-			if next, err := getNextToken(); err != nil || next.Kind != token.Int {
+			if next, err := getNextToken(); err != nil || !next.IsATypeSpecifier() {
 				resetHeadTo(pos)
 				return nil
 			}
@@ -76,15 +76,14 @@ func analyzeVariableDeclaration() *Error {
 	}
 
 	// <type-specifier>
-	if next.Kind != token.Int {
+	if !next.IsATypeSpecifier() {
 		resetHeadTo(pos)
 		return cc0_error.Of(cc0_error.IncompleteVariableDeclaration).On(currentLine, currentColumn)
 	}
-	kind := tokenKindToType(next)
-	currentInitializationKind = next.Kind
+	currentInitializationType = next.Kind
 
 	// <init-declarator-list>
-	if err := analyzeDeclaratorList(isAConstant, kind); err != nil {
+	if err := analyzeDeclaratorList(isAConstant); err != nil {
 		resetHeadTo(pos)
 		return err
 	}
@@ -97,7 +96,7 @@ func analyzeVariableDeclaration() *Error {
 	return nil
 }
 
-func analyzeInitDeclarator(isConstant bool, declaredType int) *Error {
+func analyzeInitDeclarator(isConstant bool) *Error {
 	// <init-declarator> ::= <identifier>[<initializer>]
 
 	// <identifier>
@@ -113,11 +112,11 @@ func analyzeInitDeclarator(isConstant bool, declaredType int) *Error {
 	identifier := next.Value.(string)
 
 	if isConstant {
-		if err := currentSymbolTable.AddAConstant(identifier, declaredType); err != nil {
+		if err := currentSymbolTable.AddAConstant(identifier, currentInitializationType); err != nil {
 			return err
 		}
 	} else {
-		if err := currentSymbolTable.AddAVariable(identifier, declaredType); err != nil {
+		if err := currentSymbolTable.AddAVariable(identifier, currentInitializationType); err != nil {
 			return err
 		}
 	}
@@ -142,11 +141,11 @@ func analyzeInitDeclarator(isConstant bool, declaredType int) *Error {
 		return anotherErr
 	}
 
-	if kind != currentInitializationKind {
-		convertType(kind, currentInitializationKind)
+	if kind != currentInitializationType {
+		convertType(kind, currentInitializationType)
 	}
 
-	switch currentInitializationKind {
+	switch currentInitializationType {
 	case token.Void:
 		cc0_error.ThrowAndExit(cc0_error.Parser)
 	case token.Double:

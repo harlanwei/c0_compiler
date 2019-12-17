@@ -108,7 +108,7 @@ func analyzeAdditiveExpression() (int, *Error) {
 		next, err := getNextToken()
 		if err != nil || !next.IsAnAdditiveOperator() {
 			resetHeadTo(pos)
-			return 0, nil
+			return kind, nil
 		}
 		operator := next.Kind
 		anotherKind, anotherErr := analyzeMultiplicativeExpression()
@@ -179,7 +179,12 @@ func analyzeCastExpression() (int, *Error) {
 		resetHeadTo(pos)
 		return 0, anotherErr
 	}
-	convertType(unaryKind, kind)
+	if kind == 0 {
+		kind = unaryKind
+	}
+	if kind != unaryKind {
+		convertType(unaryKind, kind)
+	}
 	return kind, nil
 }
 
@@ -198,7 +203,7 @@ func analyzeMultiplicativeExpression() (int, *Error) {
 		next, err := getNextToken()
 		if err != nil || !next.IsAMultiplicativeOperator() {
 			resetHeadTo(pos)
-			return 0, nil
+			return kind, nil
 		}
 		anotherKind, anotherErr := analyzeUnaryExpression()
 		if err != nil {
@@ -305,6 +310,10 @@ func analyzePrimaryExpression() (int, *Error) {
 		// <integer-literal>
 		currentFunction.Append(instruction.Ipush, int(next.Value.(int64)))
 		kind = token.Int
+	} else if next.Kind == token.DoubleLiteral {
+		address := globalSymbolTable.AddALiteral(instruction.ConstantKindDouble, next.Value)
+		currentFunction.Append(instruction.Loadc, -address)
+		kind = token.Double
 	} else {
 		return 0, cc0_error.Of(cc0_error.IllegalExpression).On(currentLine, currentColumn)
 	}

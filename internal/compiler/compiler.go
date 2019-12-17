@@ -3,7 +3,6 @@ package compiler
 import (
 	"bufio"
 	"c0_compiler/internal/instruction"
-	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -82,13 +81,15 @@ func writeConstant(line string) {
 	kind, value := matches[2], matches[3]
 	if kind == "I" {
 		literal, _ := strconv.Atoi(value)
+		writeI32WithWidth(1, 1)
 		writeI32WithWidth(literal, 4)
 	} else if kind == "D" {
-		v, _ := strconv.ParseFloat(value, 64)
-		vBitsAsUInt64 := math.Float64bits(v)
-		higher32Bits, lower32Bits := int(vBitsAsUInt64>>32), int(vBitsAsUInt64&lower32BitsMask)
-		writeI32WithWidth(higher32Bits, 4)
-		writeI32WithWidth(lower32Bits, 4)
+		writeI32WithWidth(2, 1)
+		for i := 2; i < len(value); i += 2 {
+			substr := value[i : i+2]
+			parsed, _ := strconv.ParseInt(substr, 16, 16)
+			writeI32WithWidth(int(parsed), 1)
+		}
 	} else if kind == "S" {
 		writeI32WithWidth(0, 1)
 		writeI32WithWidth(len(value)-2, 2)

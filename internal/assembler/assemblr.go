@@ -1,8 +1,10 @@
 package assembler
 
 import (
+	"bytes"
 	"c0_compiler/internal/cc0_error"
 	"c0_compiler/internal/instruction"
+	"encoding/binary"
 	"fmt"
 	"sort"
 )
@@ -30,6 +32,15 @@ func printLine(line instruction.Line) {
 	appendLine("%s\n", str)
 }
 
+func float64ToByte(f float64) []byte {
+	var buf bytes.Buffer
+	err := binary.Write(&buf, binary.BigEndian, f)
+	if err != nil {
+		fmt.Println("binary.Write failed:", err)
+	}
+	return buf.Bytes()
+}
+
 func assembleConstants(st *instruction.SymbolTable) {
 	appendLine(".constants:\n")
 	for index, sb := range *sortedFunctions {
@@ -42,7 +53,11 @@ func assembleConstants(st *instruction.SymbolTable) {
 		case instruction.ConstantKindInt:
 			// not used
 		case instruction.ConstantKindDouble:
-			// TODO
+			str := "0x"
+			for _, b := range float64ToByte(c.Value.(float64)) {
+				str += fmt.Sprintf("%02x", b)
+			}
+			appendLine("%d D %s\n", address, str)
 		case instruction.ConstantKindString:
 			appendLine("%d S \"%s\"\n", address, c.Value)
 		}

@@ -6,12 +6,11 @@ import (
 	"c0_compiler/internal/token"
 	"regexp"
 	"strconv"
+	"strings"
 	"unicode"
 )
 
 var isInACommentBlock = false
-var isParsingACharLiteral = false
-var isParsingAStringLiteral = false
 
 type Token = token.Token
 
@@ -59,6 +58,7 @@ func reportPosition(token *Token) {
 
 var decMatcher, _ = regexp.Compile("^(0|([1-9][0-9]*))$")
 var hexMatcher, _ = regexp.Compile("^[0-9a-fA-F]+$")
+var doubleMatcher, _ = regexp.Compile("^[0-9]+\\.[0-9]+$")
 
 // Accepts a regex matcher used to pre-check the format of the given word.
 func parseIntegerValue(matcher *regexp.Regexp, base int, word string) (int64, *parserError) {
@@ -75,6 +75,17 @@ func parseIntegerValue(matcher *regexp.Regexp, base int, word string) (int64, *p
 	return 0, &parserError{"illegal integer literal", true}
 }
 
+func parseDoubleValue(matcher *regexp.Regexp, word string) (float64, *parserError) {
+	if matcher.MatchString(word) {
+		value, err := strconv.ParseFloat(word, 64)
+		if err != nil {
+			return 0, &parserError{"Failed to parse double value", true}
+		}
+		return value, nil
+	}
+	return 0, &parserError{"Failed to parse double value", true}
+}
+
 func decIntegerParser(word string) (int64, *parserError) {
 	return parseIntegerValue(decMatcher, 10, word)
 }
@@ -85,7 +96,11 @@ func hexIntegerParser(word string) (int64, *parserError) {
 	return parseIntegerValue(hexMatcher, 16, word[2:])
 }
 
-func parseNumberLiteral(currentToken *Token) {
+func doubleParser(word string) (float64, *parserError) {
+	return parseDoubleValue(doubleMatcher, word)
+}
+
+func parseIntegerLiteral(currentToken *Token) {
 	var integerParser func(string) (int64, *parserError)
 	word := currentToken.Value.(string)
 
@@ -107,6 +122,17 @@ func parseNumberLiteral(currentToken *Token) {
 			cc0_error.ThrowButStayAlive(cc0_error.Parser)
 		}
 	}
+}
+
+func parseDoubleLiteral(currentToken *Token) {
+	parsedValue, err := doubleParser(currentToken.Value.(string))
+	if err != nil {
+		reportPosition(currentToken)
+		cc0_error.PrintlnToStdErr(err.message)
+		cc0_error.ThrowAndExit(cc0_error.Parser)
+	}
+	currentToken.Kind = token.DoubleLiteral
+	currentToken.Value = parsedValue
 }
 
 func parseOperator(currentToken *Token) {
@@ -202,14 +228,17 @@ func parseKeywords(currentToken *Token) {
 }
 
 func parseAllTheTokensIn(buffer []Token) {
-	for ind, _ := range buffer {
+	for ind := range buffer {
 		currentToken := &buffer[ind]
 
 		if currentToken.Kind == token.StringLiteral || currentToken.Kind == token.CharLiteral {
 			continue
 		}
-		if word := currentToken.Value.(string); unicode.IsNumber(rune(word[0])) {
-			parseNumberLiteral(currentToken)
+		word := currentToken.Value.(string)
+		if strings.ContainsRune(word, '.') {
+			parseDoubleLiteral(currentToken)
+		} else if unicode.IsNumber(rune(word[0])) {
+			parseIntegerLiteral(currentToken)
 		} else if unicode.IsLetter(rune(word[0])) {
 			parseKeywords(currentToken)
 		} else {
@@ -228,14 +257,6 @@ func isAnOperatorWithTwoCharacters(operator string) bool {
 		return true
 	}
 	return false
-}
-
-func isCharLiteral(r rune) bool {
-	switch r {
-	case '\'', '\\', 0x0a, 0x0d:
-		return false
-	}
-	return true
 }
 
 func parseCharSequence(line string, start int) (result rune, end int) {
