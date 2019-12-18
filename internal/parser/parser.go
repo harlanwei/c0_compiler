@@ -264,7 +264,10 @@ func parseAllTheTokensIn(buffer []Token) {
 		}
 		word := currentToken.Value.(string)
 		if strings.ContainsRune(word, '.') ||
-			(unicode.IsNumber(rune(word[0])) && strings.ToLower(word[0:2]) != "0x" && strings.ContainsRune(word, 'e')) {
+			(unicode.IsNumber(rune(word[0])) &&
+				len(word) > 2 &&
+				strings.ToLower(word[0:2]) != "0x" &&
+				strings.ContainsRune(word, 'e')) {
 			parseDoubleLiteral(currentToken)
 		} else if unicode.IsNumber(rune(word[0])) {
 			parseIntegerLiteral(currentToken)

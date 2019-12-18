@@ -12,7 +12,7 @@ func getConvertInstruction(source, dest int) int {
 	}
 	if (source == token.Int || source == token.Char) && dest == token.Double {
 		return instruction.I2d
-	} else if source == token.Double && (source == token.Int || source == token.Char) {
+	} else if source == token.Double && (dest == token.Int || dest == token.Char) {
 		return instruction.D2i
 	}
 	panic("An unexpected type convert took place here.")

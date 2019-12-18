@@ -3,7 +3,9 @@ double i2d(int c) {
 }
 
 void main() {
-    double b = 1.2e-1;
-    print(b);
+    double b = 1.2e-1; // 0.12
+    int a = 3;
+    int result = b + a - b;
+    print(result);
     return;
 }
