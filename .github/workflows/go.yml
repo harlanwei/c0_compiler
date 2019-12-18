@@ -23,4 +23,3 @@ jobs:
 
     - name: Build
       run: go build -v c0_compiler/cmd/cc0
-      working-directory: ./c0_compiler
