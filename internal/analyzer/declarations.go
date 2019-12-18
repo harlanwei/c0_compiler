@@ -134,7 +134,11 @@ func analyzeInitDeclarator(isConstant bool) *Error {
 	}
 
 	address := currentSymbolTable.GetAddressOf(identifier)
-	currentFunction.Append(instruction.Ipush, 0)
+	if currentSymbolTable.GetSymbolNamed(identifier).Kind == token.Double {
+		currentFunction.Append(instruction.Snew, 2)
+	} else {
+		currentFunction.Append(instruction.Ipush, 0)
+	}
 	currentFunction.Append(instruction.Loada, currentSymbolTable.GetLevelDiff(identifier), address)
 	kind, anotherErr := analyzeExpression()
 	if anotherErr != nil {
