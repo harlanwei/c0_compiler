@@ -85,10 +85,12 @@ func analyzePrintable() *Error {
 	if err != nil {
 		resetHeadTo(pos)
 	} else {
-		if kind == token.Int {
-			currentFunction.Append(instruction.Iprint)
-		} else {
+		if kind == token.Double {
 			currentFunction.Append(instruction.Dprint)
+		} else if kind == token.Char {
+			currentFunction.Append(instruction.Cprint)
+		} else {
+			currentFunction.Append(instruction.Iprint)
 		}
 		return nil
 	}

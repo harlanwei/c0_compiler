@@ -1,5 +1,9 @@
+double i2d(int c) {
+    return c;
+}
+
 void main() {
-    double a = 3.14;
-    print(a);
+    double b = 1.2e-1;
+    print(b);
     return;
 }

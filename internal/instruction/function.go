@@ -3,6 +3,7 @@ package instruction
 import (
 	"c0_compiler/internal/cc0_error"
 	"c0_compiler/internal/common"
+	"c0_compiler/internal/token"
 	"container/heap"
 )
 
@@ -44,9 +45,13 @@ func (f *Fn) GetCurrentOffset() int {
 }
 
 func (f *Fn) InsertInstructionAt(offset int, instruction int, operands ...int) {
-	backup := *f.instructions.lines
-	*f.instructions.lines = append(backup[0:offset], f.generateLine(instruction, operands...))
-	*f.instructions.lines = append(*f.instructions.lines, backup[offset:]...)
+	// Make a deep copy so that backup is not overwritten after the first append
+	backupArea := (*f.instructions.lines)[offset:]
+	backup := make([]Line, len(backupArea))
+	copy(backup, backupArea)
+
+	*f.instructions.lines = append((*f.instructions.lines)[0:offset], f.generateLine(instruction, operands...))
+	*f.instructions.lines = append(*f.instructions.lines, backup...)
 }
 
 func (f *Fn) GetCurrentConstantOffset() int {
@@ -84,11 +89,31 @@ func (f *Fn) Append(instruction int, operands ...int) {
 	*f.instructions.lines = append(*f.instructions.lines, f.generateLine(instruction, operands...))
 }
 
-func (f *Fn) NextMemorySlot() (slot int) {
+func (f *Fn) NextMemorySlot(kind int) (slot int) {
 	queue := f.emptyMemorySlots
 	slot = queue.Pop().(int)
 	if queue.Len() == 0 {
-		queue.Push(slot + 1)
+		if kind == token.Double {
+			queue.Push(slot + 2)
+		} else {
+			queue.Push(slot + 1)
+		}
+	} else {
+		if kind != token.Double {
+			return
+		}
+		slotBackup := []int{}
+		for {
+			nextSlot := queue.Pop().(int)
+			if nextSlot-slot >= 2 {
+				for _, backedSlot := range slotBackup {
+					queue.Push(backedSlot)
+				}
+				return
+			}
+			slotBackup = append(slotBackup, slot)
+			slot = nextSlot
+		}
 	}
 	return
 }

@@ -30,6 +30,19 @@ func convergeToLargerType(lhs, rhs int) int {
 	return rhs
 }
 
+func computeType(lhs, rhs, previousOffset int) int {
+	if lhs != rhs {
+		convergedKind := convergeToLargerType(lhs, rhs)
+		if lhs != convergedKind {
+			currentFunction.InsertInstructionAt(previousOffset, getConvertInstruction(lhs, convergedKind))
+		} else {
+			convertType(rhs, convergedKind)
+		}
+		return convergedKind
+	}
+	return lhs
+}
+
 func analyzeCondition() *Error {
 	// <condition> ::= <expression>[<relational-operator><expression>]
 
@@ -53,16 +66,7 @@ func analyzeCondition() *Error {
 		return err
 	}
 
-	if kind != anotherKind {
-		convergedKind := convergeToLargerType(kind, anotherKind)
-		if kind != convergedKind {
-			currentFunction.InsertInstructionAt(previousOffset, getConvertInstruction(kind, convergedKind))
-		} else {
-			convertType(anotherKind, convergedKind)
-		}
-		kind = convergedKind
-	}
-
+	kind = computeType(kind, anotherKind, previousOffset)
 	if kind == token.Int {
 		currentFunction.Append(instruction.Icmp)
 	} else {
@@ -117,17 +121,7 @@ func analyzeAdditiveExpression() (int, *Error) {
 			return 0, anotherErr
 		}
 
-		kind := convergeToLargerType(kind, anotherKind)
-		if kind != anotherKind {
-			convergedKind := convergeToLargerType(kind, anotherKind)
-			if kind != convergedKind {
-				currentFunction.InsertInstructionAt(previousOffset, getConvertInstruction(kind, convergedKind))
-			} else {
-				convertType(anotherKind, convergedKind)
-			}
-			kind = convergedKind
-		}
-
+		kind = computeType(kind, anotherKind, previousOffset)
 		if operator == token.PlusSign {
 			if kind == token.Double {
 				currentFunction.Append(instruction.Dadd)
@@ -205,12 +199,14 @@ func analyzeMultiplicativeExpression() (int, *Error) {
 			resetHeadTo(pos)
 			return kind, nil
 		}
+		previousOffset := currentFunction.GetCurrentOffset()
 		anotherKind, anotherErr := analyzeUnaryExpression()
 		if err != nil {
 			resetHeadTo(pos)
 			return 0, anotherErr
 		}
-		kind = convergeToLargerType(kind, anotherKind)
+		kind = computeType(kind, anotherKind, previousOffset)
+
 		if next.Kind == token.MultiplicationSign {
 			if kind == token.Double {
 				currentFunction.Append(instruction.Dmul)
@@ -253,7 +249,11 @@ func analyzeUnaryExpression() (int, *Error) {
 	}
 
 	if shouldBeNegated {
-		currentFunction.Append(instruction.Ineg)
+		if kind == token.Double {
+			currentFunction.Append(instruction.Dneg)
+		} else {
+			currentFunction.Append(instruction.Ineg)
+		}
 	}
 	return kind, nil
 }
@@ -314,6 +314,9 @@ func analyzePrimaryExpression() (int, *Error) {
 		address := globalSymbolTable.AddALiteral(instruction.ConstantKindDouble, next.Value)
 		currentFunction.Append(instruction.Loadc, -address)
 		kind = token.Double
+	} else if next.Kind == token.CharLiteral {
+		currentFunction.Append(instruction.Bipush, int(next.Value.(int32)))
+		kind = token.Char
 	} else {
 		return 0, cc0_error.Of(cc0_error.IllegalExpression).On(currentLine, currentColumn)
 	}

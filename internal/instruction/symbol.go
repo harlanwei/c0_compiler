@@ -68,7 +68,7 @@ func (st SymbolTable) AddAConstant(name string, kind int) *Error {
 		return cc0_error.Of(cc0_error.RedeclaredAnIdentifier)
 	}
 	st.Symbols[name] = Symbol{
-		Address:    st.RelatedFunction.NextMemorySlot(),
+		Address:    st.RelatedFunction.NextMemorySlot(kind),
 		FnInfo:     nil,
 		IsCallable: false,
 		IsConstant: true,
@@ -83,7 +83,7 @@ func (st SymbolTable) AddAVariable(name string, kind int) *Error {
 		return cc0_error.Of(cc0_error.RedeclaredAnIdentifier)
 	}
 	st.Symbols[name] = Symbol{
-		Address:    st.RelatedFunction.NextMemorySlot(),
+		Address:    st.RelatedFunction.NextMemorySlot(kind),
 		FnInfo:     nil,
 		IsCallable: false,
 		IsConstant: false,

@@ -128,10 +128,7 @@ func Run(globalSymbolTable *instruction.SymbolTable) *[]string {
 
 	assembleFunctions()
 
-	for name, sb := range globalSymbolTable.Symbols {
-		if !sb.IsCallable {
-			continue
-		}
+	for name, sb := range *sortedFunctions {
 		appendLine("\n.F%d:\t# %s\n", count, name)
 		for _, i := range *sb.FnInfo.GetLines() {
 			printLine(i)

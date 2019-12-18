@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"c0_compiler/internal/cc0_error"
 	"c0_compiler/internal/token"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -75,15 +76,42 @@ func parseIntegerValue(matcher *regexp.Regexp, base int, word string) (int64, *p
 	return 0, &parserError{"illegal integer literal", true}
 }
 
-func parseDoubleValue(matcher *regexp.Regexp, word string) (float64, *parserError) {
-	if matcher.MatchString(word) {
-		value, err := strconv.ParseFloat(word, 64)
-		if err != nil {
-			return 0, &parserError{"Failed to parse double value", true}
-		}
-		return value, nil
+func parseFloat(str string) (float64, error) {
+	val, err := strconv.ParseFloat(str, 64)
+	if err == nil {
+		return val, nil
 	}
-	return 0, &parserError{"Failed to parse double value", true}
+
+	// Some number is specifed in scientific notation
+	pos := strings.IndexAny(str, "eE")
+	if pos < 0 {
+		return strconv.ParseFloat(str, 64)
+	}
+
+	var baseVal float64
+	var expVal int64
+
+	baseStr := str[0:pos]
+	baseVal, err = strconv.ParseFloat(baseStr, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	expStr := str[(pos + 1):]
+	expVal, err = strconv.ParseInt(expStr, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return baseVal * math.Pow10(int(expVal)), nil
+}
+
+func parseDoubleValue(matcher *regexp.Regexp, word string) (float64, *parserError) {
+	value, err := parseFloat(word)
+	if err != nil {
+		return 0, &parserError{"Failed to parse double value", true}
+	}
+	return value, nil
 }
 
 func decIntegerParser(word string) (int64, *parserError) {
@@ -235,7 +263,8 @@ func parseAllTheTokensIn(buffer []Token) {
 			continue
 		}
 		word := currentToken.Value.(string)
-		if strings.ContainsRune(word, '.') {
+		if strings.ContainsRune(word, '.') ||
+			(unicode.IsNumber(rune(word[0])) && strings.ToLower(word[0:2]) != "0x" && strings.ContainsRune(word, 'e')) {
 			parseDoubleLiteral(currentToken)
 		} else if unicode.IsNumber(rune(word[0])) {
 			parseIntegerLiteral(currentToken)
@@ -340,7 +369,9 @@ func divideTokens(lineCount int, line string, buffer *[]Token) {
 		}
 		end := columnCount
 		if isDigitOrLetter(character) {
-			for end < len(line) && isDigitOrLetter(rune(line[end])) {
+			previousCharacter := '0'
+			for end < len(line) && (isDigitOrLetter(rune(line[end])) || (previousCharacter == 'e' && line[end] == '-')) {
+				previousCharacter = rune(line[end])
 				end++
 			}
 		} else {
