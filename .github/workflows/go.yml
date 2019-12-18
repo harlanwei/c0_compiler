@@ -22,5 +22,5 @@ jobs:
         path: c0_compiler
 
     - name: Build
-      working-directory: ${{ github.workspace }}/c0_compiler
-      run: pwd; go build -v c0_compiler/cmd/cc0
+      run: go build -v c0_compiler/cmd/cc0
+      working-directory: ./c0_compiler
