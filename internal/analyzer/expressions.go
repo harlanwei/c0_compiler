@@ -71,7 +71,7 @@ func analyzeCondition() *Error {
 	}
 
 	kind = computeType(kind, anotherKind, previousOffset)
-	if kind == token.Int {
+	if kind == token.Int || kind == token.Char {
 		currentFunction.Append(instruction.Icmp)
 	} else {
 		currentFunction.Append(instruction.Dcmp)
@@ -413,7 +413,7 @@ func analyzeExpressionList(fn *instruction.Fn) *Error {
 	if currentDeclaredCount > currentFnTotalParams {
 		return cc0_error.Of(cc0_error.IllegalExpression).On(currentLine, currentColumn)
 	}
-	if paramKind := fn.RelatedSymbolTable.GetSymbolNamed((*fn.Parameters)[currentDeclaredCount - 1]).Kind; kind != paramKind {
+	if paramKind := fn.RelatedSymbolTable.GetSymbolNamed((*fn.Parameters)[currentDeclaredCount-1]).Kind; kind != paramKind {
 		convertType(kind, paramKind)
 	}
 
@@ -434,7 +434,7 @@ func analyzeExpressionList(fn *instruction.Fn) *Error {
 		if currentDeclaredCount > currentFnTotalParams {
 			return cc0_error.Of(cc0_error.IllegalExpression).On(currentLine, currentColumn)
 		}
-		if paramKind := fn.RelatedSymbolTable.GetSymbolNamed((*fn.Parameters)[currentDeclaredCount - 1]).Kind; anotherKind != paramKind {
+		if paramKind := fn.RelatedSymbolTable.GetSymbolNamed((*fn.Parameters)[currentDeclaredCount-1]).Kind; anotherKind != paramKind {
 			convertType(anotherKind, paramKind)
 		}
 	}
