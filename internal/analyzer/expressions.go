@@ -15,11 +15,13 @@ func getConvertInstruction(source, dest int) int {
 	} else if source == token.Double && (dest == token.Int || dest == token.Char) {
 		return instruction.D2i
 	}
-	panic("An unexpected type convert took place here.")
 	return 0
 }
 
 func convertType(source, dest int) {
+	if source == dest {
+		return
+	}
 	currentFunction.Append(getConvertInstruction(source, dest))
 }
 
@@ -34,7 +36,7 @@ func computeType(lhs, rhs, previousOffset int) int {
 	if lhs != rhs {
 		convergedKind := convergeToLargerType(lhs, rhs)
 		if lhs != convergedKind {
-			currentFunction.InsertInstructionAt(previousOffset, getConvertInstruction(lhs, convergedKind))
+			currentFunction.ReplaceNopAt(previousOffset, getConvertInstruction(lhs, convergedKind))
 		} else {
 			convertType(rhs, convergedKind)
 		}
@@ -52,11 +54,13 @@ func analyzeCondition() *Error {
 		resetHeadTo(pos)
 		return err
 	}
-	previousOffset := currentFunction.GetCurrentOffset()
+	currentFunction.Append(instruction.Nop)
+	previousOffset := currentFunction.GetCurrentOffset() - 1
 	pos = getCurrentPos()
 	next, anotherErr := getNextToken()
 	if anotherErr != nil || !next.IsARelationalOperator() {
 		resetHeadTo(pos)
+		currentFunction.ChangeInstructionTo(previousOffset, instruction.Je, 0)
 		return nil
 	}
 	operator := next.Kind
@@ -104,7 +108,9 @@ func analyzeAdditiveExpression() (int, *Error) {
 	if err != nil {
 		return 0, err
 	}
-	previousOffset := currentFunction.GetCurrentOffset()
+
+	currentFunction.Append(instruction.Nop)
+	previousOffset := currentFunction.GetCurrentOffset() - 1
 
 	// {<additive-operator><multiplicative-expression>}
 	for {
@@ -138,36 +144,7 @@ func analyzeAdditiveExpression() (int, *Error) {
 	}
 }
 
-func analyzeCastExpression() (int, *Error) {
-	// <cast-expression> ::= {'('<type-specifier>')'}<unary-expression>
-	pos := getCurrentPos()
-	kind := 0
-	next, err := getNextToken()
-	if err != nil {
-		resetHeadTo(pos)
-		return 0, cc0_error.Of(cc0_error.IncompleteExpression)
-	}
-	if next.Kind == token.LeftParenthesis {
-		next, err := getNextToken()
-		if err != nil {
-			return 0, cc0_error.Of(cc0_error.IncompleteExpression)
-		}
-		kind = next.Kind
-		for {
-			anotherPos := getCurrentPos()
-			next, err = getNextToken()
-			if err != nil {
-				resetHeadTo(anotherPos)
-				return 0, cc0_error.Of(cc0_error.IncompleteExpression)
-			}
-			if !next.IsATypeSpecifier() {
-				resetHeadTo(anotherPos)
-				break
-			}
-		}
-	} else {
-		resetHeadTo(pos)
-	}
+func analyzeCastExpressionHelper(pos, kind int) (int, *Error) {
 	unaryKind, anotherErr := analyzeUnaryExpression()
 	if anotherErr != nil {
 		resetHeadTo(pos)
@@ -182,12 +159,60 @@ func analyzeCastExpression() (int, *Error) {
 	return kind, nil
 }
 
+func analyzeCastExpression() (int, *Error) {
+	// <cast-expression> ::= {'('<type-specifier>')'}<unary-expression>
+	pos := getCurrentPos()
+	kind := 0
+	next, err := getNextToken()
+	if err != nil {
+		resetHeadTo(pos)
+		return 0, cc0_error.Of(cc0_error.IncompleteExpression)
+	}
+	if next.Kind == token.LeftParenthesis {
+		next, err := getNextToken()
+		if err != nil || !next.IsATypeSpecifier() {
+			resetHeadTo(pos)
+			return analyzeCastExpressionHelper(pos, kind)
+		}
+		kind = next.Kind
+		next, err = getNextToken()
+		if err != nil || next.Kind != token.RightParenthesis {
+			return 0, cc0_error.Of(cc0_error.IncompleteExpression)
+		}
+		for {
+			anotherPos := getCurrentPos()
+			next, err = getNextToken()
+			if err != nil {
+				resetHeadTo(anotherPos)
+				return 0, cc0_error.Of(cc0_error.IncompleteExpression)
+			}
+			if next.Kind != token.LeftParenthesis {
+				resetHeadTo(anotherPos)
+				break
+			}
+			next, err = getNextToken()
+			if err != nil || !next.IsATypeSpecifier() {
+				resetHeadTo(anotherPos)
+				break
+			}
+			next, err = getNextToken()
+			if err != nil || next.Kind != token.RightParenthesis {
+				resetHeadTo(anotherPos)
+				return 0, cc0_error.Of(cc0_error.IncompleteExpression)
+			}
+		}
+	} else {
+		resetHeadTo(pos)
+	}
+	return analyzeCastExpressionHelper(pos, kind)
+}
+
 func analyzeMultiplicativeExpression() (int, *Error) {
 	// <multiplicative-expression> ::= <cast-expression>{<multiplicative-operator><cast-expression>}
 
 	// <cast-expression>
 	kind, err := analyzeCastExpression()
-	if err != nil {
+	if err != nil && kind == 0 {
 		return 0, err
 	}
 
@@ -199,7 +224,8 @@ func analyzeMultiplicativeExpression() (int, *Error) {
 			resetHeadTo(pos)
 			return kind, nil
 		}
-		previousOffset := currentFunction.GetCurrentOffset()
+		currentFunction.Append(instruction.Nop)
+		previousOffset := currentFunction.GetCurrentOffset() - 1
 		anotherKind, anotherErr := analyzeUnaryExpression()
 		if err != nil {
 			resetHeadTo(pos)
@@ -331,6 +357,15 @@ func analyzeAssignmentExpression() *Error {
 		resetHeadTo(pos)
 		return cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
 	}
+
+	// pre read
+	preReadPos := getCurrentPos()
+	theOneAfterNext, err := getNextToken()
+	resetHeadTo(preReadPos)
+	if err == nil && theOneAfterNext.Kind != token.AssignmentSign {
+		return cc0_error.Of(cc0_error.IncompleteExpression)
+	}
+
 	identifier := next.Value.(string)
 	if currentSymbolTable.GetSymbolNamed(identifier).IsConstant {
 		cc0_error.ReportLineAndColumn(currentLine, currentColumn)
@@ -344,30 +379,63 @@ func analyzeAssignmentExpression() *Error {
 	}
 	currentFunction.Append(instruction.Loada, currentSymbolTable.GetLevelDiff(identifier), address)
 	kind, anotherErr := analyzeExpression()
-	convertType(kind, currentSymbolTable.GetSymbolNamed(identifier).Kind)
+	if currentVariableKind := currentSymbolTable.GetSymbolNamed(identifier).Kind; kind != currentVariableKind {
+		convertType(kind, currentSymbolTable.GetSymbolNamed(identifier).Kind)
+		kind = currentVariableKind
+	}
 	if anotherErr != nil {
 		resetHeadTo(pos)
 		return anotherErr
 	}
-	currentFunction.Append(instruction.Istore)
+	if kind == token.Double {
+		currentFunction.Append(instruction.Dstore)
+	} else {
+		currentFunction.Append(instruction.Istore)
+	}
 	return nil
 }
 
-func analyzeExpressionList() *Error {
+var currentFnTotalParams = 0
+var currentDeclaredCount = 0
+
+func analyzeExpressionList(fn *instruction.Fn) *Error {
 	// <expression-list> ::= <expression>{','<expression>}
+	currentDeclaredCount = 0
+	currentFnTotalParams = len(*fn.Parameters)
+
 	pos := getCurrentPos()
-	if _, err := analyzeExpression(); err != nil {
+	kind, err := analyzeExpression()
+	if err != nil {
 		resetHeadTo(pos)
 		return err
 	}
+	currentDeclaredCount++
+	if currentDeclaredCount > currentFnTotalParams {
+		return cc0_error.Of(cc0_error.IllegalExpression).On(currentLine, currentColumn)
+	}
+	if paramKind := fn.RelatedSymbolTable.GetSymbolNamed((*fn.Parameters)[currentDeclaredCount - 1]).Kind; kind != paramKind {
+		convertType(kind, paramKind)
+	}
+
 	for {
 		pos = getCurrentPos()
 		if next, err := getNextToken(); err != nil || next.Kind != token.Comma {
 			resetHeadTo(pos)
+			if currentDeclaredCount != currentFnTotalParams {
+				return cc0_error.Of(cc0_error.IllegalExpression).On(currentLine, currentColumn)
+			}
 			return nil
 		}
-		if _, err := analyzeExpression(); err != nil {
+		anotherKind, err := analyzeExpression()
+		if err != nil {
 			return err
+		}
+		currentDeclaredCount++
+		if currentDeclaredCount > currentFnTotalParams {
+			return cc0_error.Of(cc0_error.IllegalExpression).On(currentLine, currentColumn)
+		}
+		if paramKind := fn.RelatedSymbolTable.GetSymbolNamed((*fn.Parameters)[currentDeclaredCount - 1]).Kind; anotherKind != paramKind {
+			convertType(anotherKind, paramKind)
 		}
 	}
 }
@@ -393,12 +461,15 @@ func analyzeFunctionCall() *Error {
 		resetHeadTo(pos)
 		return cc0_error.Of(cc0_error.IncompleteFunctionCall).On(currentLine, currentColumn)
 	}
-	// TODO: check parameters
-	_ = analyzeExpressionList()
+	_ = analyzeExpressionList(sb.FnInfo)
 	if next, err := getNextToken(); err != nil || next.Kind != token.RightParenthesis {
 		resetHeadTo(pos)
 		return cc0_error.Of(cc0_error.IncompleteFunctionCall).On(currentLine, currentColumn)
 	}
 	currentFunction.Append(instruction.Call, sb.Address)
+	if currentDeclaredCount != currentFnTotalParams {
+		resetHeadTo(pos)
+		return cc0_error.Of(cc0_error.IllegalExpression).On(currentLine, currentColumn)
+	}
 	return nil
 }

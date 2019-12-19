@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"c0_compiler/internal/cc0_error"
 	"c0_compiler/internal/instruction"
+	"c0_compiler/internal/token"
 	"encoding/binary"
 	"fmt"
 	"sort"
@@ -68,7 +69,16 @@ func assembleConstants(st *instruction.SymbolTable) {
 func assembleFunctions() {
 	appendLine(".functions:\n")
 	for index, sb := range *sortedFunctions {
-		appendLine("%d %d %d 1\t# %s\n", index, index, len(*sb.FnInfo.Parameters), sb.Name)
+		requiredSize := 0
+		for _, parameterName := range *sb.FnInfo.Parameters {
+			switch sb.FnInfo.RelatedSymbolTable.GetSymbolNamed(parameterName).Kind {
+			case token.Double:
+				requiredSize += 2
+			default:
+				requiredSize += 1
+			}
+		}
+		appendLine("%d %d %d 1\t# %s\n", index, index, requiredSize, sb.Name)
 	}
 }
 
@@ -104,7 +114,7 @@ func sortFunctions(table *instruction.SymbolTable) {
 		if !sb.IsCallable {
 			continue
 		}
-		*sortedFunctions = append(*sortedFunctions, sb)
+		*sortedFunctions = append(*sortedFunctions, *sb)
 	}
 	By(func(p1, p2 *instruction.Symbol) bool { return p1.Address < p2.Address }).Sort(*sortedFunctions)
 }

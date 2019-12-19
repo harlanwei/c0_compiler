@@ -7,7 +7,16 @@ type Line struct {
 
 func (l *Line) SetFirstOperandTo(operand int) {
 	if len(*l.Operands) < 1 {
-		panic("trying to set an operand that does not exist")
+		copied := []int{operand}
+		l.Operands = &copied
+		return
 	}
 	(*l.Operands)[0] = operand
+}
+
+func (l *Line) ChangeInstructionTo(instruction int, operands ...int) {
+	copied := make([]int, len(operands))
+	copy(copied, operands)
+	l.I = GetInstruction(instruction)
+	l.Operands = &copied
 }

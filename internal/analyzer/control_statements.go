@@ -31,6 +31,10 @@ func analyzeConditionStatement() *Error {
 	if err := analyzeStatement(); err != nil {
 		return err
 	}
+
+	currentFunction.Append(instruction.Nop)
+	offsetOfFirstLineAfterIf := currentFunction.GetCurrentOffset() - 1
+
 	ifOffset := currentFunction.GetCurrentOffset()
 	conditionalJumpLine.SetFirstOperandTo(ifOffset)
 
@@ -44,6 +48,10 @@ func analyzeConditionStatement() *Error {
 		resetHeadTo(pos)
 		return err
 	}
+
+	currentOffset := currentFunction.GetCurrentOffset()
+	currentFunction.ChangeInstructionTo(offsetOfFirstLineAfterIf, instruction.Jmp, currentOffset)
+
 	return nil
 }
 
@@ -78,7 +86,7 @@ func analyzeReturnStatement() *Error {
 	switch currentFunction.ReturnType {
 	case token.Double:
 		currentFunction.Append(instruction.Dret)
-	case token.Int:
+	case token.Int, token.Char:
 		currentFunction.Append(instruction.Iret)
 	case token.Void:
 		currentFunction.Append(instruction.Ret)

@@ -40,7 +40,7 @@ func analyzeFunctionDefinition() *Error {
 		return cc0_error.Of(cc0_error.InvalidDeclaration).On(currentLine, currentColumn)
 	}
 	identifier := next.Value.(string)
-	if err := globalSymbolTable.AddAFunction(identifier, kind); err != nil {
+	if err := globalSymbolTable.AddAFunction(identifier, kind, currentFunction); err != nil {
 		resetHeadTo(pos)
 		return err
 	}
@@ -53,10 +53,21 @@ func analyzeFunctionDefinition() *Error {
 		return err
 	}
 
+	switch currentFunction.ReturnType {
+	case token.Void:
+		currentFunction.Append(instruction.Ret)
+	case token.Int, token.Char:
+		currentFunction.Append(instruction.Ipush, 0)
+		currentFunction.Append(instruction.Iret)
+	case token.Double:
+		currentFunction.Append(instruction.Snew, 0)
+		currentFunction.Append(instruction.Dret)
+	}
+
 	if funSymbol := globalSymbolTable.GetSymbolNamed(identifier); funSymbol != nil {
 		// Have to do the assignment this way thanks to all the trivia of golang
 		funSymbol.FnInfo = currentFunction
-		globalSymbolTable.Symbols[identifier] = *funSymbol
+		globalSymbolTable.Symbols[identifier] = funSymbol
 	}
 
 	currentFunction = globalStart
@@ -93,6 +104,7 @@ func analyzeParameterClause() *Error {
 		resetHeadTo(pos)
 		return cc0_error.Of(cc0_error.IncompleteExpression)
 	}
+
 	return nil
 }
 

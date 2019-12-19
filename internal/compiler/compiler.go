@@ -14,7 +14,7 @@ const lower32BitsMask = 0xffffffff
 var magics = []byte{0x43, 0x30, 0x3a, 0x29}
 var version = []byte{0x0, 0x0, 0x0, 0x1}
 var functionMatcher, _ = regexp.Compile("\\.F[0-9]+:")
-var constantParser, _ = regexp.Compile("^([0-9]+) (.) (.+)")
+var constantParser, _ = regexp.Compile("(?s)^([0-9]+) (.) (.+)")
 
 // Global variables
 var allLines []string
@@ -79,6 +79,7 @@ func writeI32WithWidth(value, width int) {
 func writeConstant(line string) {
 	matches := constantParser.FindStringSubmatch(line)
 	kind, value := matches[2], matches[3]
+	value = strings.TrimRight(value, "\n")
 	if kind == "I" {
 		literal, _ := strconv.Atoi(value)
 		writeI32WithWidth(1, 1)

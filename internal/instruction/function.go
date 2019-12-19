@@ -22,6 +22,7 @@ type Fn struct {
 	emptyMemorySlots      *PriorityQueue
 	currentConstantOffset int
 	stackSize             int
+	RelatedSymbolTable    *SymbolTable
 }
 
 func InitFn(returnType int) (res *Fn) {
@@ -44,14 +45,8 @@ func (f *Fn) GetCurrentOffset() int {
 	return len(*f.instructions.lines)
 }
 
-func (f *Fn) InsertInstructionAt(offset int, instruction int, operands ...int) {
-	// Make a deep copy so that backup is not overwritten after the first append
-	backupArea := (*f.instructions.lines)[offset:]
-	backup := make([]Line, len(backupArea))
-	copy(backup, backupArea)
-
-	*f.instructions.lines = append((*f.instructions.lines)[0:offset], f.generateLine(instruction, operands...))
-	*f.instructions.lines = append(*f.instructions.lines, backup...)
+func (f *Fn) ReplaceNopAt(offset int, instruction int, operands ...int) {
+	f.ChangeInstructionTo(offset, instruction, operands...)
 }
 
 func (f *Fn) GetCurrentConstantOffset() int {
@@ -120,4 +115,12 @@ func (f *Fn) NextMemorySlot(kind int) (slot int) {
 
 func (f *Fn) PopStack(reservedSize int) {
 	f.Append(Popn, f.stackSize-reservedSize)
+}
+
+func (f *Fn) ChangeInstructionTo(offset, instruction int, operands ...int) {
+	l := &((*f.instructions.lines)[offset])
+	copied := make([]int, len(operands))
+	copy(copied, operands)
+	l.I = GetInstruction(instruction)
+	l.Operands = &copied
 }

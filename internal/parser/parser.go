@@ -267,7 +267,7 @@ func parseAllTheTokensIn(buffer []Token) {
 			(unicode.IsNumber(rune(word[0])) &&
 				len(word) > 2 &&
 				strings.ToLower(word[0:2]) != "0x" &&
-				strings.ContainsRune(word, 'e')) {
+				strings.ContainsRune(strings.ToLower(word), 'e')) {
 			parseDoubleLiteral(currentToken)
 		} else if unicode.IsNumber(rune(word[0])) {
 			parseIntegerLiteral(currentToken)
@@ -306,6 +306,15 @@ func parseCharSequence(line string, start int) (result rune, end int) {
 			resultAsInt64, _ := strconv.ParseInt(line[start+2:start+4], 16, 32)
 			result = rune(resultAsInt64)
 			end = start + 4
+		} else if line[start+1] == 'n' {
+			result = '\n'
+			end = start + 2
+		} else if line[start+1] == 'r' {
+			result = '\r'
+			end = start + 2
+		} else if line[start+1] == 't' {
+			result = '\t'
+			end = start + 2
 		} else {
 			result = rune(line[start+1])
 			end = start + 2
@@ -373,7 +382,8 @@ func divideTokens(lineCount int, line string, buffer *[]Token) {
 		end := columnCount
 		if isDigitOrLetter(character) {
 			previousCharacter := '0'
-			for end < len(line) && (isDigitOrLetter(rune(line[end])) || (previousCharacter == 'e' && line[end] == '-')) {
+			for end < len(line) && (isDigitOrLetter(rune(line[end])) ||
+				((previousCharacter == 'e' || previousCharacter == 'E') && line[end] == '-')) {
 				previousCharacter = rune(line[end])
 				end++
 			}
@@ -407,7 +417,7 @@ func divideTokens(lineCount int, line string, buffer *[]Token) {
 		}
 
 		if isInACommentBlock {
-			return
+			continue
 		}
 		if currentTokenString == "'" {
 			if columnCount+2 >= len(line) {

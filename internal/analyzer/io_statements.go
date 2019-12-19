@@ -37,13 +37,22 @@ func analyzeIOStatement() *Error {
 			resetHeadTo(pos)
 			return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
 		}
-		if err := analyzePrintableList(); err != nil {
-			resetHeadTo(pos)
-			return err
-		}
-		if next, err := getNextToken(); err != nil || next.Kind != token.RightParenthesis {
+		pos := getCurrentPos()
+		preReadNext, err := getNextToken()
+		if err != nil {
 			resetHeadTo(pos)
 			return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
+		}
+		if preReadNext.Kind != token.RightParenthesis {
+			resetHeadTo(pos)
+			if err := analyzePrintableList(); err != nil {
+				resetHeadTo(pos)
+				return err
+			}
+			if next, err := getNextToken(); err != nil || next.Kind != token.RightParenthesis {
+				resetHeadTo(pos)
+				return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
+			}
 		}
 		currentFunction.Append(instruction.Printl)
 	} else {
