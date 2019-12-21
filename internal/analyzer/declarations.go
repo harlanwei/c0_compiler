@@ -125,11 +125,17 @@ func analyzeInitDeclarator(isConstant bool) *Error {
 	pos = getCurrentPos()
 	next, err = getNextToken()
 	if err != nil {
+		if isConstant {
+			return cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
+		}
 		return nil
 	}
 	if next.Kind != token.AssignmentSign {
-		currentFunction.Append(instruction.Snew, 1)
 		resetHeadTo(pos)
+		if isConstant {
+			return cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
+		}
+		currentFunction.Append(instruction.Snew, 1)
 		return nil
 	}
 

@@ -25,6 +25,10 @@ func analyzeIOStatement() *Error {
 			return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
 		}
 		identifier := next.Value.(string)
+		if symb := currentSymbolTable.GetSymbolNamed(identifier); symb == nil || symb.IsConstant {
+			resetHeadTo(pos)
+			return cc0_error.Of(cc0_error.IllegalExpression)
+		}
 		if next, err := getNextToken(); err != nil || next.Kind != token.RightParenthesis {
 			resetHeadTo(pos)
 			return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
@@ -94,11 +98,14 @@ func analyzePrintable() *Error {
 	if err != nil {
 		resetHeadTo(pos)
 	} else {
-		if kind == token.Double {
+		switch kind {
+		case token.Double:
 			currentFunction.Append(instruction.Dprint)
-		} else if kind == token.Char {
+		case token.Char:
 			currentFunction.Append(instruction.Cprint)
-		} else {
+		case token.Void:
+			return cc0_error.Of(cc0_error.InvalidStatement)
+		default:
 			currentFunction.Append(instruction.Iprint)
 		}
 		return nil

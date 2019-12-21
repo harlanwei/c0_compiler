@@ -148,7 +148,7 @@ func analyzeParameterDeclaration() *Error {
 			return cc0_error.Of(cc0_error.InvalidDeclaration).On(currentLine, currentColumn)
 		}
 	}
-	if !next.IsATypeSpecifier() {
+	if !next.IsATypeSpecifier() || next.Kind == token.Void {
 		return cc0_error.Of(cc0_error.InvalidDeclaration).On(currentLine, currentColumn)
 	}
 	kind := next.Kind
