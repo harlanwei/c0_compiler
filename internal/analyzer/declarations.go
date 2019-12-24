@@ -135,7 +135,11 @@ func analyzeInitDeclarator(isConstant bool) *Error {
 		if isConstant {
 			return cc0_error.Of(cc0_error.IncompleteExpression).On(currentLine, currentColumn)
 		}
-		currentFunction.Append(instruction.Snew, 1)
+		if currentInitializationType == token.Double {
+			currentFunction.Append(instruction.Snew, 2)
+		} else {
+			currentFunction.Append(instruction.Snew, 1)
+		}
 		return nil
 	}
 

@@ -60,7 +60,7 @@ func analyzeFunctionDefinition() *Error {
 		currentFunction.Append(instruction.Ipush, 0)
 		currentFunction.Append(instruction.Iret)
 	case token.Double:
-		currentFunction.Append(instruction.Snew, 0)
+		currentFunction.Append(instruction.Snew, 2)
 		currentFunction.Append(instruction.Dret)
 	}
 

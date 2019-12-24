@@ -14,6 +14,8 @@ func getConvertInstruction(source, dest int) int {
 		return instruction.I2d
 	} else if source == token.Double && (dest == token.Int || dest == token.Char) {
 		return instruction.D2i
+	} else if source == token.Int && dest == token.Char {
+		return instruction.I2c
 	}
 	return 0
 }

@@ -1,0 +1,7 @@
+char test(char a) {
+    return a;
+}
+
+int main() {
+    print((int)test(2598));
+}
