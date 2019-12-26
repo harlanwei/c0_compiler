@@ -6,25 +6,29 @@ import (
 	"c0_compiler/internal/token"
 )
 
-func getConvertInstruction(source, dest int) int {
+func getConvertInstruction(source, dest int) []int {
 	if source == token.Void || dest == token.Void {
 		cc0_error.ThrowAndExit(cc0_error.Analyzer)
 	}
 	if (source == token.Int || source == token.Char) && dest == token.Double {
-		return instruction.I2d
-	} else if source == token.Double && (dest == token.Int || dest == token.Char) {
-		return instruction.D2i
+		return []int{instruction.I2d}
+	} else if source == token.Double && dest == token.Int {
+		return []int{instruction.D2i}
+	} else if source == token.Double && dest == token.Char {
+		return []int{instruction.D2i, instruction.I2c}
 	} else if source == token.Int && dest == token.Char {
-		return instruction.I2c
+		return []int{instruction.I2c}
 	}
-	return 0
+	return []int{0}
 }
 
 func convertType(source, dest int) {
 	if source == dest {
 		return
 	}
-	currentFunction.Append(getConvertInstruction(source, dest))
+	for _, inst := range getConvertInstruction(source, dest) {
+		currentFunction.Append(inst)
+	}
 }
 
 func convergeToLargerType(lhs, rhs int) int {
@@ -38,7 +42,7 @@ func computeType(lhs, rhs, previousOffset int) int {
 	if lhs != rhs {
 		convergedKind := convergeToLargerType(lhs, rhs)
 		if lhs != convergedKind {
-			currentFunction.ReplaceNopAt(previousOffset, getConvertInstruction(lhs, convergedKind))
+			currentFunction.ReplaceNopAt(previousOffset, getConvertInstruction(lhs, convergedKind)[0])
 		} else {
 			convertType(rhs, convergedKind)
 		}
@@ -146,17 +150,26 @@ func analyzeAdditiveExpression() (int, *Error) {
 	}
 }
 
-func analyzeCastExpressionHelper(pos, kind int) (int, *Error) {
+func analyzeCastExpressionHelper(pos int, kindStack []int) (int, *Error) {
 	unaryKind, anotherErr := analyzeUnaryExpression()
 	if anotherErr != nil {
 		resetHeadTo(pos)
 		return 0, anotherErr
 	}
-	if kind == 0 {
+	kind := 0
+	if len(kindStack) == 0 {
 		kind = unaryKind
-	}
-	if kind != unaryKind {
-		convertType(unaryKind, kind)
+	} else {
+		lastKind := unaryKind
+		for len(kindStack) > 0 {
+			lastPos := len(kindStack) - 1
+			kind = kindStack[lastPos]
+			if kind != lastKind {
+				convertType(lastKind, kind)
+			}
+			lastKind = kind
+			kindStack = kindStack[0:lastPos]
+		}
 	}
 	return kind, nil
 }
@@ -166,6 +179,7 @@ func analyzeCastExpression() (int, *Error) {
 	pos := getCurrentPos()
 	kind := 0
 	next, err := getNextToken()
+	typeStack := []int{}
 	if err != nil {
 		resetHeadTo(pos)
 		return 0, cc0_error.Of(cc0_error.IncompleteExpression)
@@ -174,9 +188,11 @@ func analyzeCastExpression() (int, *Error) {
 		next, err := getNextToken()
 		if err != nil || !next.IsATypeSpecifier() {
 			resetHeadTo(pos)
-			return analyzeCastExpressionHelper(pos, kind)
+			return analyzeCastExpressionHelper(pos, typeStack)
 		}
 		kind = next.Kind
+		typeStack = append(typeStack, kind)
+
 		next, err = getNextToken()
 		if err != nil || next.Kind != token.RightParenthesis {
 			return 0, cc0_error.Of(cc0_error.IncompleteExpression)
@@ -197,6 +213,9 @@ func analyzeCastExpression() (int, *Error) {
 				resetHeadTo(anotherPos)
 				break
 			}
+			nextKind := next.Kind
+			typeStack = append(typeStack, nextKind)
+
 			next, err = getNextToken()
 			if err != nil || next.Kind != token.RightParenthesis {
 				resetHeadTo(anotherPos)
@@ -206,7 +225,7 @@ func analyzeCastExpression() (int, *Error) {
 	} else {
 		resetHeadTo(pos)
 	}
-	return analyzeCastExpressionHelper(pos, kind)
+	return analyzeCastExpressionHelper(pos, typeStack)
 }
 
 func analyzeMultiplicativeExpression() (int, *Error) {

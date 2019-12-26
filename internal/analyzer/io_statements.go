@@ -34,8 +34,19 @@ func analyzeIOStatement() *Error {
 			return cc0_error.Of(cc0_error.InvalidStatement).On(currentLine, currentColumn)
 		}
 		currentFunction.Append(instruction.Loada, currentSymbolTable.GetLevelDiff(identifier), currentSymbolTable.GetAddressOf(identifier))
-		currentFunction.Append(instruction.Iscan)
-		currentFunction.Append(instruction.Istore)
+		targetKind := currentSymbolTable.GetSymbolNamed(identifier).Kind
+		switch targetKind {
+		case token.Int:
+			currentFunction.Append(instruction.Iscan)
+			currentFunction.Append(instruction.Istore)
+		case token.Char:
+			currentFunction.Append(instruction.Cscan)
+			currentFunction.Append(instruction.Istore)
+		case token.Double:
+			currentFunction.Append(instruction.Dscan)
+			currentFunction.Append(instruction.Dstore)
+		}
+
 	} else if next.Kind == token.Print {
 		if next, err := getNextToken(); err != nil || next.Kind != token.LeftParenthesis {
 			resetHeadTo(pos)
